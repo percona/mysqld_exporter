@@ -841,25 +841,37 @@ func main() {
 		log.Fatal(srv.ListenAndServeTLS(*sslCertFile, *sslKeyFile))
 	} else {
 		// http
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(NewExporter(dsn))
-		handler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+		registryHr := prometheus.NewRegistry()
+		registryHr.MustRegister(NewExporter(dsn))
+		gatherersHr := prometheus.Gatherers{
+			prometheus.DefaultGatherer,
+			registryHr,
+		}
+		handler := promhttp.HandlerFor(gatherersHr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
 		http.Handle(*metricPath+"-hr", handler)
 
-		reg = prometheus.NewRegistry()
-		reg.MustRegister(NewExporterMr(dsn))
-		handler = promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+		registryMr := prometheus.NewRegistry()
+		registryMr.MustRegister(NewExporterMr(dsn))
+		gatherersMr := prometheus.Gatherers{
+			prometheus.DefaultGatherer,
+			registryMr,
+		}
+		handler = promhttp.HandlerFor(gatherersMr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
 		http.Handle(*metricPath+"-mr", handler)
 
-		reg = prometheus.NewRegistry()
-		reg.MustRegister(NewExporterLr(dsn))
-		handler = promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+		registryLr := prometheus.NewRegistry()
+		registryLr.MustRegister(NewExporterLr(dsn))
+		gatherersLr := prometheus.Gatherers{
+			prometheus.DefaultGatherer,
+			registryLr,
+		}
+		handler = promhttp.HandlerFor(gatherersLr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
