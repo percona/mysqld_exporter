@@ -190,9 +190,6 @@ func TestBin(t *testing.T) {
 		t.Fatalf("Failed to build: %s", err)
 	}
 
-	data := binData{
-		bin: bin,
-	}
 	tests := []func(*testing.T, binData){
 		testLandingPage,
 		testVersion,
@@ -204,9 +201,12 @@ func TestBin(t *testing.T) {
 		for _, f := range tests {
 			f := f // capture range variable
 			fName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
+			portStart++
+			data := binData{
+				bin:  bin,
+				port: portStart,
+			}
 			t.Run(fName, func(t *testing.T) {
-				portStart++
-				data.port = portStart
 				t.Parallel()
 				f(t, data)
 			})
