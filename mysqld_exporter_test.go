@@ -312,7 +312,7 @@ func testLandingPage(t *testing.T, data binData) {
 
 func testDefaultGatherer(t *testing.T, data binData) {
 	metricPath := "/metrics"
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(
@@ -351,7 +351,7 @@ func testDefaultGatherer(t *testing.T, data binData) {
 }
 
 func get(urlToGet string) (body []byte, err error) {
-	tries := 10
+	tries := 60
 
 	// Get data, but we need to wait a bit for http server
 	for i := 0; i <= tries; i++ {
