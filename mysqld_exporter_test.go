@@ -330,7 +330,7 @@ func testDefaultGatherer(t *testing.T, data binData) {
 	defer cmd.Process.Kill()
 
 	for _, resolution := range []string{"hr", "mr", "lr"} {
-		body, err := get(fmt.Sprintf("http://127.0.0.1:%d/%s-%s", data.port, metricPath, resolution))
+		body, err := get(fmt.Sprintf("http://127.0.0.1:%d%s-%s", data.port, metricPath, resolution))
 		if err != nil {
 			t.Fatalf("unable to get metrics for '%s' resolution: %s", resolution, err)
 		}
