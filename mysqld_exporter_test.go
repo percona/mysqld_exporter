@@ -190,25 +190,23 @@ func TestBin(t *testing.T) {
 		t.Fatalf("Failed to build: %s", err)
 	}
 
-	port, err := getFreePort()
-	if err != nil {
-		t.Fatalf("Failed to get free port: %s", err)
-	}
-
 	data := binData{
-		bin:  bin,
-		port: port,
+		bin: bin,
 	}
 	tests := []func(*testing.T, binData){
 		testLandingPage,
 		testVersion,
 		testDefaultGatherer,
 	}
+
+	portStart := 56000
 	t.Run(binName, func(t *testing.T) {
 		for _, f := range tests {
 			f := f // capture range variable
 			fName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
 			t.Run(fName, func(t *testing.T) {
+				portStart++
+				data.port = portStart
 				t.Parallel()
 				f(t, data)
 			})
@@ -291,32 +289,7 @@ func testLandingPage(t *testing.T, data binData) {
 	defer cmd.Process.Kill()
 
 	// Get the main page, but we need to wait a bit for http server
-	var resp *http.Response
-	var err error
-	for i := 0; i <= 10; i++ {
-		// Try to get main page
-		resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%d", data.port))
-		if err == nil {
-			break
-		}
-
-		// If there is a syscall.ECONNREFUSED error (web server not available) then retry
-		if urlError, ok := err.(*url.Error); ok {
-			if opError, ok := urlError.Err.(*net.OpError); ok {
-				if osSyscallError, ok := opError.Err.(*os.SyscallError); ok {
-					if osSyscallError.Err == syscall.ECONNREFUSED {
-						time.Sleep(1 * time.Second)
-						continue
-					}
-				}
-			}
-		}
-
-		t.Fatalf("%#v: %s", err, err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := get(fmt.Sprintf("http://127.0.0.1:%d", data.port))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,37 +329,11 @@ func testDefaultGatherer(t *testing.T, data binData) {
 	defer cmd.Wait()
 	defer cmd.Process.Kill()
 
-	var err error
 	for _, resolution := range []string{"hr", "mr", "lr"} {
-		var resp *http.Response
-		// Get data, but we need to wait a bit for http server
-		for i := 0; i <= 10; i++ {
-			// Try to get main page
-			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%d/%s-%s", data.port, metricPath, resolution))
-			if err == nil {
-				break
-			}
-
-			// If there is a syscall.ECONNREFUSED error (web server not available) then retry
-			if urlError, ok := err.(*url.Error); ok {
-				if opError, ok := urlError.Err.(*net.OpError); ok {
-					if osSyscallError, ok := opError.Err.(*os.SyscallError); ok {
-						if osSyscallError.Err == syscall.ECONNREFUSED {
-							time.Sleep(1 * time.Second)
-							continue
-						}
-					}
-				}
-			}
-
-			t.Fatalf("%#v: %s", err, err)
-		}
-
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := get(fmt.Sprintf("http://127.0.0.1:%d/%s-%s", data.port, metricPath, resolution))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unable to get metrics for '%s' resolution: %s", resolution, err)
 		}
-		resp.Body.Close()
 		got := string(body)
 
 		metricsPrefixes := []string{
@@ -397,22 +344,52 @@ func testDefaultGatherer(t *testing.T, data binData) {
 
 		for _, prefix := range metricsPrefixes {
 			if !strings.Contains(got, prefix) {
-				t.Fatalf("No metric starting with %s in resolution %s", prefix, resolution)
+				t.Fatalf("no metric starting with %s in resolution %s", prefix, resolution)
 			}
 		}
 	}
 }
 
-func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, err
+func get(urlToGet string) (body []byte, err error) {
+	tries := 10
+
+	// Get data, but we need to wait a bit for http server
+	for i := 0; i <= tries; i++ {
+		// Try to get main page
+		body, err = getBody(urlToGet)
+		if err == nil {
+			return body, err
+		}
+
+		// If there is a syscall.ECONNREFUSED error (web server not available) then retry
+		if urlError, ok := err.(*url.Error); ok {
+			if opError, ok := urlError.Err.(*net.OpError); ok {
+				if osSyscallError, ok := opError.Err.(*os.SyscallError); ok {
+					if osSyscallError.Err == syscall.ECONNREFUSED {
+						time.Sleep(1 * time.Second)
+						continue
+					}
+				}
+			}
+		}
+
+		return nil, err
 	}
 
-	l, err := net.ListenTCP("tcp", addr)
+	return nil, fmt.Errorf("failed to GET %s: %s", urlToGet, err)
+}
+
+func getBody(urlToGet string) ([]byte, error) {
+	resp, err := http.Get(urlToGet)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
 }
