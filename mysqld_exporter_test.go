@@ -329,23 +329,22 @@ func testDefaultGatherer(t *testing.T, data binData) {
 	defer cmd.Wait()
 	defer cmd.Process.Kill()
 
-	for _, resolution := range []string{"hr", "mr", "lr"} {
-		body, err := get(fmt.Sprintf("http://127.0.0.1:%d%s-%s", data.port, metricPath, resolution))
-		if err != nil {
-			t.Fatalf("unable to get metrics for '%s' resolution: %s", resolution, err)
-		}
-		got := string(body)
+	const resolution = "hr"
+	body, err := get(fmt.Sprintf("http://127.0.0.1:%d%s-%s", data.port, metricPath, resolution))
+	if err != nil {
+		t.Fatalf("unable to get metrics for '%s' resolution: %s", resolution, err)
+	}
+	got := string(body)
 
-		metricsPrefixes := []string{
-			"go_gc_duration_seconds",
-			"go_goroutines",
-			"go_memstats",
-		}
+	metricsPrefixes := []string{
+		"go_gc_duration_seconds",
+		"go_goroutines",
+		"go_memstats",
+	}
 
-		for _, prefix := range metricsPrefixes {
-			if !strings.Contains(got, prefix) {
-				t.Fatalf("no metric starting with %s in resolution %s", prefix, resolution)
-			}
+	for _, prefix := range metricsPrefixes {
+		if !strings.Contains(got, prefix) {
+			t.Fatalf("no metric starting with %s in resolution %s", prefix, resolution)
 		}
 	}
 }

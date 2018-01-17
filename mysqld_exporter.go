@@ -795,11 +795,7 @@ func main() {
 
 		registryHr := prometheus.NewRegistry()
 		registryHr.MustRegister(NewExporter(dsn))
-		gatherersHr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryHr,
-		}
-		handler := promhttp.HandlerFor(gatherersHr, promhttp.HandlerOpts{})
+		handler := promhttp.HandlerFor(prometheus.Gatherers{prometheus.DefaultGatherer, registryHr}, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
@@ -807,11 +803,7 @@ func main() {
 
 		registryMr := prometheus.NewRegistry()
 		registryMr.MustRegister(NewExporterMr(dsn))
-		gatherersMr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryHr,
-		}
-		handler = promhttp.HandlerFor(gatherersMr, promhttp.HandlerOpts{})
+		handler = promhttp.HandlerFor(registryMr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
@@ -819,11 +811,7 @@ func main() {
 
 		registryLr := prometheus.NewRegistry()
 		registryLr.MustRegister(NewExporterLr(dsn))
-		gatherersLr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryLr,
-		}
-		handler = promhttp.HandlerFor(gatherersLr, promhttp.HandlerOpts{})
+		handler = promhttp.HandlerFor(registryLr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
@@ -855,11 +843,7 @@ func main() {
 		// http
 		registryHr := prometheus.NewRegistry()
 		registryHr.MustRegister(NewExporter(dsn))
-		gatherersHr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryHr,
-		}
-		handler := promhttp.HandlerFor(gatherersHr, promhttp.HandlerOpts{})
+		handler := promhttp.HandlerFor(prometheus.Gatherers{prometheus.DefaultGatherer, registryHr}, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
@@ -867,11 +851,7 @@ func main() {
 
 		registryMr := prometheus.NewRegistry()
 		registryMr.MustRegister(NewExporterMr(dsn))
-		gatherersMr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryMr,
-		}
-		handler = promhttp.HandlerFor(gatherersMr, promhttp.HandlerOpts{})
+		handler = promhttp.HandlerFor(registryMr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
@@ -879,11 +859,7 @@ func main() {
 
 		registryLr := prometheus.NewRegistry()
 		registryLr.MustRegister(NewExporterLr(dsn))
-		gatherersLr := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registryLr,
-		}
-		handler = promhttp.HandlerFor(gatherersLr, promhttp.HandlerOpts{})
+		handler = promhttp.HandlerFor(registryLr, promhttp.HandlerOpts{})
 		if cfg.User != "" && cfg.Password != "" {
 			handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		}
