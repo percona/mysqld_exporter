@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/model"
 )
 
 const (
@@ -214,8 +213,10 @@ func parseWsrepProviderOptions(opts string) float64 {
 	return val
 }
 
-// validPrometheusName converts any string to valid Prometheus metric name.
 func validPrometheusName(s string) string {
+	nameRe := regexp.MustCompile("([^a-zA-Z0-9_])")
+	s = nameRe.ReplaceAllString(s, "_")
 	s = strings.ToLower(s)
-	return model.MetricNameRE.ReplaceAllString(s, "_")
+	s = strings.Replace(s, ".", "_", -1)
+	return s
 }
