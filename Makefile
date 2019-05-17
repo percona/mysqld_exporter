@@ -38,7 +38,7 @@ test:
 
 verify-vendor:
 	@echo ">> verify that vendor/ is in sync with code and Gopkg.*"
-	curl https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 -L -o ~/dep && chmod +x ~/dep
+	curl https://github.com/golang/dep/releases/download/v0.5.2/dep-linux-amd64 -L -o ~/dep && chmod +x ~/dep
 	rm -fr vendor/
 	~/dep ensure -v -vendor-only
 	git diff --exit-code

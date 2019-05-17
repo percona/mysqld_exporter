@@ -4,8 +4,7 @@ language: go
 
 go:
 - 1.12.x
-- 1.11.x
- 
+
 env:
 - MYSQL_IMAGE=mysql/mysql-server:5.5
 - MYSQL_IMAGE=mysql/mysql-server:5.6
