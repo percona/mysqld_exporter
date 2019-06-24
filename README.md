@@ -6,20 +6,38 @@ NOTE: Not all collection methods are supported on MySQL < 5.6
 
 ## Building and running
 
+### Prerequisites:
+
+* [Go compiler](https://golang.org/dl/)
+
 ### Required Grants
+
+Following permissions should be granted to the user which ``mysqld_exporter`` will use to access MySQL:
 
 ```sql
 CREATE USER 'exporter'@'localhost' IDENTIFIED BY 'XXXXXXXX' WITH MAX_USER_CONNECTIONS 10;
 GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
 ```
 
-NOTE: It is recommended to set a max connection limit for the user to avoid overloading the server with monitoring scrapes under heavy load.
+NOTE: It is recommended to set a [max connection limit](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_max_connections) for the user to avoid overloading the server with monitoring scrapes under heavy load.
 
 ### Build
 
+ 1. Get the code from the official repository:
+ 
+    ```bash
+    go get github.com/prometheus/mysqld_exporter
+    ```
+ 2. Switch to the buld directory and run ``make``:
+ 
+    ```bash
+    cd ${GOPATH-$HOME/go}/src/github.com/prometheus/mysqld_exporter
     make
+    ``` 
 
 ### Running
+
+When the build process is over, you can run the exporter either using an environment variable or configuration file.
 
 Running using an environment variable:
 
