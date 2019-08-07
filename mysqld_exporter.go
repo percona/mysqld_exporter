@@ -402,8 +402,8 @@ func main() {
 		log.Infoln("HTTPS/TLS is enabled")
 	}
 
-	// New http server
-	mux := http.NewServeMux()
+	// Use default mux for /debug/vars and /debug/pprof
+	mux := http.DefaultServeMux
 
 	// Defines what to scrape in each resolution.
 	hr, mr, lr := enabledScrapers(scraperFlags)
