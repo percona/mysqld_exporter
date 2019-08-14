@@ -26,7 +26,7 @@ NOTE: It is recommended to set a [max connection limit](https://dev.mysql.com/do
  1. Get the code from the official repository:
  
     ```bash
-    go get github.com/prometheus/mysqld_exporter
+    go get -u github.com/prometheus/mysqld_exporter
     ```
  2. Switch to the buld directory and run ``make``:
  
