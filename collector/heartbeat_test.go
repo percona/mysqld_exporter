@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"flag"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,14 +11,8 @@ import (
 )
 
 func TestScrapeHeartbeat(t *testing.T) {
-	err := flag.Set("collect.heartbeat.database", "heartbeat-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = flag.Set("collect.heartbeat.table", "heartbeat-test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	*collectHeartbeatDatabase = "heartbeat-test"
+	*collectHeartbeatTable = "heartbeat-test"
 
 	db, mock, err := sqlmock.New()
 	if err != nil {

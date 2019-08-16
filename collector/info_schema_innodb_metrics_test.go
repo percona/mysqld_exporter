@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"flag"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,12 +11,6 @@ import (
 )
 
 func TestScrapeInnodbMetrics(t *testing.T) {
-	// Suppress a log messages
-	err := flag.Set("log.level", "fatal")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("error opening a stub database connection: %s", err)

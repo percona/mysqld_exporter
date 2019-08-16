@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -17,14 +16,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
 )
 
 var (
-	userQueriesPath = flag.String(
-		"queries-file-name", "/usr/local/percona/pmm-client/queries-mysqld.yml", // Default path.
+	userQueriesPath = kingpin.Flag(
+		"queries-file-name",
 		"Path to custom queries file.",
-	)
+	).Default("/usr/local/percona/pmm-client/queries-mysqld.yml").String() // Default path.
 )
 
 // ColumnUsage should be one of several enum values which describe how a

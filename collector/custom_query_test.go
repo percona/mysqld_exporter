@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,11 +32,8 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 		tmpFileName := createTmpFile(t, customQueryCounter)
 		defer os.Remove(tmpFileName)
 
-		err := flag.Set("queries-file-name", tmpFileName)
-		if err != nil {
-			t.Fatalf("cannot set flag: %s", err)
-		}
-		flag.Parse()
+		*userQueriesPath = tmpFileName
+
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)
@@ -99,11 +95,8 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 		tmpFileName := createTmpFile(t, customQueryDuration)
 		defer os.Remove(tmpFileName)
 
-		err := flag.Set("queries-file-name", tmpFileName)
-		if err != nil {
-			t.Fatalf("cannot set flag: %s", err)
-		}
-		flag.Parse()
+		*userQueriesPath = tmpFileName
+
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)
@@ -165,11 +158,8 @@ func TestScrapeCustomQueriesDbError(t *testing.T) {
 		tmpFileName := createTmpFile(t, customQueryNoDb)
 		defer os.Remove(tmpFileName)
 
-		err := flag.Set("queries-file-name", tmpFileName)
-		if err != nil {
-			t.Fatalf("cannot set flag: %s", err)
-		}
-		flag.Parse()
+		*userQueriesPath = tmpFileName
+
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)
@@ -200,11 +190,8 @@ func TestScrapeCustomQueriesIncorrectYaml(t *testing.T) {
 		tmpFileName := createTmpFile(t, customQueryIncorrectYaml)
 		defer os.Remove(tmpFileName)
 
-		err := flag.Set("queries-file-name", tmpFileName)
-		if err != nil {
-			t.Fatalf("cannot set flag: %s", err)
-		}
-		flag.Parse()
+		*userQueriesPath = tmpFileName
+
 		db, _, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)
@@ -224,11 +211,9 @@ func TestScrapeCustomQueriesIncorrectYaml(t *testing.T) {
 
 func TestScrapeCustomQueriesNoFile(t *testing.T) {
 	convey.Convey("Passed as a custom queries unexisted file or path", t, func() {
-		err := flag.Set("queries-file-name", "/wrong/path/custom_query_test.yaml")
-		if err != nil {
-			t.Fatalf("cannot set flag: %s", err)
-		}
-		flag.Parse()
+
+		*userQueriesPath = "/wrong/path/custom_query_test.yaml"
+
 		db, _, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)

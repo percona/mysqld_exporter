@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"testing"
 
@@ -13,10 +12,8 @@ import (
 )
 
 func TestScrapePerfFileInstances(t *testing.T) {
-	err := flag.Set("collect.perf_schema.file_instances.filter", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	*performanceSchemaFileInstancesFilter = ""
+	*performanceSchemaFileInstancesRemovePrefix = "/var/lib/mysql/"
 
 	db, mock, err := sqlmock.New()
 	if err != nil {
