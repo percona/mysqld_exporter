@@ -131,12 +131,12 @@ func TestBin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err := os.RemoveAll(binDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	//defer func() {
+	//	err := os.RemoveAll(binDir)
+	//	if err != nil {
+	//		t.Fatal(err)
+	//	}
+	//}()
 
 	importpath := "github.com/percona/mysqld_exporter/vendor/github.com/prometheus/common"
 	path := binDir + "/" + binName
