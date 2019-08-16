@@ -77,7 +77,7 @@ var (
 	exporterConnMaxLifetime = kingpin.Flag(
 		"exporter.conn-max-lifetime",
 		"Maximum amount of time a connection may be reused. https://golang.org/pkg/database/sql/#DB.SetConnMaxLifetime",
-	).Default(fmt.Sprintf("%s", 60*time.Second)).Duration()
+	).Default(string(60*time.Second)).Duration()
 	collectAll = kingpin.Flag(
 		"collect.all",
 		"Collect all metrics.",
