@@ -25,15 +25,15 @@ var (
 	collectCustomQueryLrDirectory = kingpin.Flag(
 		"collect.custom_query.lr.directory",
 		"Path to custom queries with low resolution directory.",
-	).Default("/usr/local/percona/pmm-client/lr").String() // Default path.
+	).Default("/usr/local/percona/pmm-client/custom-queries/mysql/low-resolution").String() // Default path.
 	collectCustomQueryMrDirectory = kingpin.Flag(
 		"collect.custom_query.mr.directory",
 		"Path to custom queries with medium resolution directory.",
-	).Default("/usr/local/percona/pmm-client/mr").String() // Default path.
+	).Default("/usr/local/percona/pmm-client/custom-queries/mysql/medium-resolution").String() // Default path.
 	collectCustomQueryHrDirectory = kingpin.Flag(
 		"collect.custom_query.hr.directory",
 		"Path to custom queries with high resolution directory.",
-	).Default("/usr/local/percona/pmm-client/hr").String() // Default path.
+	).Default("/usr/local/percona/pmm-client/custom-queries/mysql/high-resolution").String() // Default path.
 )
 
 // ColumnUsage should be one of several enum values which describe how a
