@@ -24,7 +24,7 @@ var (
 	userQueriesPath = kingpin.Flag(
 		"queries-file-name",
 		"Path to custom queries file.",
-	).Default("/usr/local/percona/pmm-client/queries-mysqld.yml").String() // Default path.
+	).Default("/usr/local/percona/pmm-client/queries-mysqld.yml").String()
 )
 
 // ColumnUsage should be one of several enum values which describe how a
