@@ -34,15 +34,15 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 		tmpFileName := createTmpFile(t, string(HR), customQueryCounter)
 		defer os.Remove(tmpFileName)
 
-		*collectCustomQueryHrDirectory = filepath.Dir(tmpFileName)
-
-		defer os.Remove(*collectCustomQueryHrDirectory)
 		_, err := kingpin.CommandLine.Parse([]string{
-			"--queries-file-name", tmpFileName,
+			"--collect.custom_query.hr.directory", filepath.Dir(tmpFileName),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		defer os.Remove(*collectCustomQueryHrDirectory)
+
 
 		db, mock, err := sqlmock.New()
 		if err != nil {
