@@ -297,7 +297,7 @@ func main() {
 		f := kingpin.Flag(
 			"collect."+scraper.Name(),
 			scraper.Help(),
-		).Default(fmt.Sprintf("%t", enabledByDefault)).Bool()
+		).Default(strconv.FormatBool(enabledByDefault)).Bool()
 
 		scraperFlags[scraper] = f
 	}

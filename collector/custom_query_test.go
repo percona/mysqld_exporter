@@ -12,6 +12,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const customQueryCounter = `
@@ -34,7 +35,14 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 		defer os.Remove(tmpFileName)
 
 		*collectCustomQueryHrDirectory = filepath.Dir(tmpFileName)
+
 		defer os.Remove(*collectCustomQueryHrDirectory)
+		_, err := kingpin.CommandLine.Parse([]string{
+			"--queries-file-name", tmpFileName,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		db, mock, err := sqlmock.New()
 		if err != nil {
