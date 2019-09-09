@@ -268,6 +268,7 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 			db, err = newDB(dsn)
 			if err != nil {
 				log.Fatalln("Error opening connection to database:", err)
+				return
 			}
 			defer db.Close()
 		}
@@ -343,6 +344,7 @@ func main() {
 		var err error
 		if dsn, err = parseMycnf(*configMycnf); err != nil {
 			log.Fatal(err)
+			return
 		}
 	}
 
@@ -366,6 +368,7 @@ func main() {
 		db, err = newDB(dsn)
 		if err != nil {
 			log.Fatalln("Error opening connection to database:", err)
+			return
 		}
 		defer db.Close()
 	}
@@ -382,14 +385,17 @@ func main() {
 		bytes, err := ioutil.ReadFile(*webAuthFile)
 		if err != nil {
 			log.Fatal("Cannot read auth file: ", err)
+			return
 		}
 		if err := yaml.Unmarshal(bytes, cfg); err != nil {
 			log.Fatal("Cannot parse auth file: ", err)
+			return
 		}
 	} else if httpAuth != "" {
 		data := strings.SplitN(httpAuth, ":", 2)
 		if len(data) != 2 || data[0] == "" || data[1] == "" {
 			log.Fatal("HTTP_AUTH should be formatted as user:password")
+			return
 		}
 		cfg.User = data[0]
 		cfg.Password = data[1]
@@ -400,14 +406,17 @@ func main() {
 
 	if *sslCertFile != "" && *sslKeyFile == "" || *sslCertFile == "" && *sslKeyFile != "" {
 		log.Fatal("One of the flags -web.ssl-cert or -web.ssl-key is missed to enable HTTPS/TLS")
+		return
 	}
 	ssl := false
 	if *sslCertFile != "" && *sslKeyFile != "" {
 		if _, err := os.Stat(*sslCertFile); os.IsNotExist(err) {
 			log.Fatal("SSL certificate file does not exist: ", *sslCertFile)
+			return
 		}
 		if _, err := os.Stat(*sslKeyFile); os.IsNotExist(err) {
 			log.Fatal("SSL key file does not exist: ", *sslKeyFile)
+			return
 		}
 		ssl = true
 		log.Infoln("HTTPS/TLS is enabled")
