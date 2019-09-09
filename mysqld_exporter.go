@@ -137,14 +137,18 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeCustomQuery{Resolution: collector.HR}: false,
 	collector.ScrapeCustomQuery{Resolution: collector.MR}: false,
 	collector.ScrapeCustomQuery{Resolution: collector.LR}: false,
+	collector.NewStandardGo():                             false,
+	collector.NewStandardProcess():                        false,
 }
 
+// TODO Remove
 var scrapersHr = map[collector.Scraper]struct{}{
 	collector.ScrapeGlobalStatus{}:                        {},
 	collector.ScrapeInnodbMetrics{}:                       {},
 	collector.ScrapeCustomQuery{Resolution: collector.HR}: {},
 }
 
+// TODO Remove
 var scrapersMr = map[collector.Scraper]struct{}{
 	collector.ScrapeSlaveStatus{}:                         {},
 	collector.ScrapeProcesslist{}:                         {},
@@ -158,6 +162,7 @@ var scrapersMr = map[collector.Scraper]struct{}{
 	collector.ScrapeCustomQuery{Resolution: collector.MR}: {},
 }
 
+// TODO Remove
 var scrapersLr = map[collector.Scraper]struct{}{
 	collector.ScrapeGlobalVariables{}:                     {},
 	collector.ScrapeTableSchema{}:                         {},
@@ -420,7 +425,7 @@ func main() {
 	mux.Handle(*metricPath+"-lr", newHandler(cfg, db, collector.NewMetrics("lr"), lr, false))
 
 	// Handle all metrics on one endpoint.
-	mux.Handle(*metricPath, newHandler(cfg, db, collector.NewMetrics(""), all, true))
+	mux.Handle(*metricPath, newHandler(cfg, db, collector.NewMetrics(""), all, false))
 
 	// Log which scrapers are enabled.
 	if len(hr) > 0 {
