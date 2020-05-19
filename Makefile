@@ -39,7 +39,7 @@ test:
 verify-vendor:
 	@echo ">> ensure that vendor/ is in sync with code and Gopkg.toml/lock"
 	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	dep check
+	/home/nurlan/go/bin/dep check
 
 format:
 	@echo ">> formatting code"
