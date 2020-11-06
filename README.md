@@ -1,4 +1,5 @@
 # Percona MySQL Server Exporter [![Build Status](https://travis-ci.org/percona/mysqld_exporter.svg?branch=master)](https://travis-ci.org/percona/mysqld_exporter) [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mysqld_exporter)](https://cla-assistant.percona.com/percona/mysqld_exporter)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpercona%2Fmysqld_exporter.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpercona%2Fmysqld_exporter?ref=badge_shield)
 
 Prometheus exporter for MySQL server metrics.
 Supported MySQL versions: 5.1 and up.
@@ -165,3 +166,7 @@ As a general rule of thumb, please try to create bug reports that are:
 -   *Specific.* Include as much detail as possible: which version, what environment, etc.
 -   *Unique.* Do not duplicate existing tickets.
 -   *Scoped to a Single Bug.* One bug per report.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpercona%2Fmysqld_exporter.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpercona%2Fmysqld_exporter?ref=badge_large)
