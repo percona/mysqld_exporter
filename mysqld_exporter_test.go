@@ -75,6 +75,66 @@ func TestParseMycnf(t *testing.T) {
 			[hello]
 			world
 		`
+		ssl1 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl=1
+		`
+		ssl2 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl-mode=REQUIRED
+		`
+		ssl3 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl=1
+			ssl-verify-server-cert
+		`
+		ssl4 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl=0
+			ssl-verify-server-cert
+		`
+		ssl5 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl-verify-server-cert
+		`
+		ssl6 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl=1
+			skip-ssl
+		`
+		ssl7 = `
+			[client]
+			user = zapp
+			password = brannigan
+			host = 1.2.3.4
+			port = 3307
+			ssl=1
+			disable-ssl
+		`
 	)
 	convey.Convey("Various .my.cnf configurations", t, func() {
 		convey.Convey("Local tcp connection", func() {
@@ -112,6 +172,34 @@ func TestParseMycnf(t *testing.T) {
 		convey.Convey("Invalid config", func() {
 			_, err := parseMycnf([]byte(badConfig4))
 			convey.So(err, convey.ShouldNotBeNil)
+		})
+		convey.Convey("SSL enabled - ssl skip verify certs", func() {
+			dsn, _ := parseMycnf([]byte(ssl1))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/?tls=skip-verify")
+		})
+		convey.Convey("SSL enabled - ssl-mode skip verify certs", func() {
+			dsn, _ := parseMycnf([]byte(ssl2))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/?tls=skip-verify")
+		})
+		convey.Convey("SSL enabled - ssl verify certs", func() {
+			dsn, _ := parseMycnf([]byte(ssl3))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/?tls=preferred")
+		})
+		convey.Convey("SSL disabled (ssl=0)", func() {
+			dsn, _ := parseMycnf([]byte(ssl4))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/")
+		})
+		convey.Convey("SSL disabled (ssl missing)", func() {
+			dsn, _ := parseMycnf([]byte(ssl5))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/")
+		})
+		convey.Convey("SSL disabled (skip-ssl)", func() {
+			dsn, _ := parseMycnf([]byte(ssl6))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/")
+		})
+		convey.Convey("SSL disabled (disable-ssl)", func() {
+			dsn, _ := parseMycnf([]byte(ssl7))
+			convey.So(dsn, convey.ShouldEqual, "zapp:brannigan@tcp(1.2.3.4:3307)/")
 		})
 	})
 }

@@ -204,6 +204,22 @@ func parseMycnf(config interface{}) (string, error) {
 	} else {
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/", user, password, host, port)
 	}
+
+	// See https://dev.mysql.com/doc/refman/5.5/en/connection-options.html#option_general_ssl-mode
+	// ssl param was deprecated (but still available) in MySQL 5.7 in favor of ssl-mode.
+	// It doesn't exists in MySQL 8.0+
+	ssl, _ := strconv.ParseBool(cfg.Section("client").Key("ssl").String())
+	sslMode := strings.ToLower(cfg.Section("client").Key("ssl-mode").String())
+	sslEnabled := (ssl || sslMode == "required") && !cfg.Section("client").HasKey("skip-ssl") &&
+		!cfg.Section("client").HasKey("disable-ssl")
+	if sslEnabled {
+		if cfg.Section("client").HasKey("ssl-verify-server-cert") {
+			dsn += "?tls=preferred"
+		} else {
+			dsn += "?tls=skip-verify"
+		}
+	}
+
 	log.Debugln(dsn)
 	return dsn, nil
 }
