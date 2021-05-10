@@ -72,7 +72,7 @@ func (ScrapeInfoSchemaInnodbTablespaces) Help() string {
 
 // Version of MySQL from which scraper is available.
 func (ScrapeInfoSchemaInnodbTablespaces) Version() float64 {
-	return 8.0
+	return 5.7
 }
 
 // Scrape collects data.
