@@ -1,13 +1,13 @@
 dist: trusty
-sudo: required
 language: go
+os: linux
 
 go:
   - 1.15.x
   - 1.14.x
   - tip
 
-matrix:
+jobs:
   fast_finish: true
   allow_failures:
     - go: tip
@@ -20,9 +20,9 @@ branches:
 env:
   global:
     # REVIEWDOG_GITHUB_API_TOKEN
-    - secure: "I/5PNi3hEv5FFDH3uL0S1SrVRzkDhtpOsfg23QvlZ0btAcOEEOgjp5mVov+5wORvbugtvpy+wMne0kxKtT1HXBewBGapDa7mfR5OH9keyo+aFDf/SLtW2RftxDavi2LhlakVpKBt4AseWCqrOTabhr/FkRQi2yBffbKYUKdu5po/zEouOcWVcQnxZdNvP1tcDQDfe74pqWCIq9L8wW0j7XNbWLZ9XxfdTysK4xSMfDCqwB2rwwVhHsB5ckz9ed77y2NUOg/OzQ1lIYKH90JV8WIkfxcmWGHliALZJHvOW4E6U6/Yf91ab1ZKbCBBREuN9cbS17WxlKsdgHOYr5P5GKIHf8chrNkPk0XfMZWvpVAVTkMruldjZZ+DKCV0//ShUx3lLeccDtM53akO//cMTZp+FQdKi+javJ31mAbO+hcNA1GnaqjxGRhYGJ1YcP6PrNgW/3062CKg5ZZQGOU6vpfAisegNh8p6h5lylTxPeOlaoyqPesTy1ySb7SQz095h+x3eVEQtthWI6OO3zePhDForHGc1USUdx4SJ1wlGXb/MlY+J35Uhb6OVJaqu7FIJABv+sToiUr3PQKOAgHKJ5e5VWDmApSH95PE0guZH16ijrmUBKeAOWKxh2afPnt4noOJqC7tP5xm8Mb+3XrLiVVz+pInYWRJQU/yK3DmbIk="
+    - secure: sm+fjrkgWFOypC87OnxBek9BnZp9ezOndg/sh+NecUGm48Ux2Wf/wbaHVXysDCekW08aapnma7GSVJUngEREvaJ/9s4NrDVcBYvuvwYcSS/M2tdhiPkUFM+P8D4Xu7pVJU/ZOHej+t7D8u79oF9FzU2T2JLLYgwMh6tA2lmpt9gVOnv1jWAmqCvznL02GS6OxfcFuJHDtrbYgaKNa1UEbKtewmWvLkDwTShdlJfqdqvFxoyxEcJYisOnMLxH3q4So3PeGp4ehyP4zodtyTOZAVLdu1x8sYtrzcA5p/z3u/m3BYk+hUV7nX7choPbTKgg3SI/GMvlXmxsQDvjNXATskGe1dRy6wxGdIYALFWAuDIDX4hQkLG7mKRJ55Wu1kEPGb/liCJo3XQ/+6Xl7F7Kd2bNO4cR+dXhf6AIVnn2BUeezXEmzouDNTus8nzgSVTz0IKK/QNCZHLvuzoqBw6gpiJnWXz21jQucM3ADIqqU+z8fNINbZu2amc8e53mXRDtGXEe/rnDLqb6WPfJWt/YpSaqJobMZ/mVOBv68b9C1rauKhMqeVwUSp6Qb/UWkOMrpDY2KDbR3qR9yrAftKMcvN1/FKVInjgR+ITPt5qvbnOxCYlTTBaKnXSUjCkrjamvGVlLREpM1RBpndjfzr8wEWXvu0zzcrlWupPXpR2WEtI=
 
-  matrix:
+  jobs:
     - MYSQL_IMAGE=mysql/mysql-server:5.5
     - MYSQL_IMAGE=mysql/mysql-server:5.6
     - MYSQL_IMAGE=mysql/mysql-server:5.7
@@ -41,7 +41,7 @@ env:
     - MYSQL_IMAGE=percona:8.0
 
 services:
-- docker
+  - docker
 
 go_import_path: github.com/percona/mysqld_exporter
 
@@ -60,8 +60,8 @@ before_script:
   - docker-compose up -d
 
 script:
-- make all
-- make test
+  - make all
+  - make test
 
 notifications:
   email: false
