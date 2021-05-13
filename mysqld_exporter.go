@@ -262,15 +262,43 @@ func init() {
 }
 
 func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []collector.Scraper, defaultGatherer bool) http.HandlerFunc {
-	processing := false
+	processing_lr := false
+  processing_mr := false
+  processing_hr := false
 	return func(w http.ResponseWriter, r *http.Request) {
-		if processing {
-			log.Info("Received metrics request while previous still in progress: returning 429 Too Many Requests")
-			http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
-			return
-		}
-		processing = true
-		defer func() { processing = false }()
+    start := time.Now()
+    query_collect := r.URL.Query().Get("collect[]")
+    log.Infof("REQUEST RECEIVED: %q %v %s", r.URL.Path, r.URL.Query(), query_collect)
+    switch query_collect {
+    case "custom_query.hr":
+      if processing_hr {
+        log.Info("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
+        log.Infof("REQUEST FAILED: %q %v", r.URL.Path, r.URL.Query())
+  			http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+  			return
+      }
+      processing_hr = true
+      defer func() { processing_hr = false }()
+    case "custom_query.mr":
+      if processing_mr {
+        log.Info("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
+        log.Infof("REQUEST FAILED: %q %v", r.URL.Path, r.URL.Query())
+  			http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+  			return
+      }
+      processing_mr = true
+      defer func() { processing_mr = false }()
+    case "custom_query.lr":
+      if processing_lr {
+        log.Info("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
+        log.Infof("REQUEST FAILED: %q %v", r.URL.Path, r.URL.Query())
+  			http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+  			return
+      }
+      processing_lr = true
+      defer func() { processing_lr = false }()
+    }
+    defer func() { log.Infof("REQUEST ELAPSED TIME: %v %s", time.Since(start), query_collect) }()
 
 		filteredScrapers := scrapers
 		params := r.URL.Query()["collect[]"]

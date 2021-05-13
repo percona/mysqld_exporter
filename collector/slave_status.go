@@ -110,7 +110,7 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 		}
 	}
 
-	log.Infof("Successfully scraped status with query: %s", query)
+	//log.Infof("Successfully scraped status with query: %s", query)
 
 	defer slaveStatusRows.Close()
 
