@@ -113,7 +113,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 			label := "collect." + scraper.Name()
 			scrapeTime := time.Now()
 			if err := scraper.Scrape(scrapeCtx, e.db, ch); err != nil {
-				log.Errorln("Error scraping for "+label+":", err)
+				log.Debugln("Error scraping for "+label+":", err)
 				e.metrics.ScrapeErrors.WithLabelValues(label).Inc()
 				e.metrics.Error.Set(1)
 			}
