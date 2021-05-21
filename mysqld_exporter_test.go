@@ -183,7 +183,7 @@ func TestBin(t *testing.T) {
 		}
 	}()
 
-	importpath := "github.com/percona/mysqld_exporter/vendor/github.com/prometheus/common"
+	importpath := "github.com/prometheus/common"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
 		importpath + "/version.Version":  "gotest-version",
@@ -289,6 +289,7 @@ func testVersion(t *testing.T, data bin) {
   build user:
   build date:
   go version:
+  platform:
 `
 
 	expectedScanner := bufio.NewScanner(bytes.NewBufferString(expectedRegexp))
