@@ -24,7 +24,7 @@ TMPDIR              ?= $(shell dirname $(shell mktemp)/)
 
 default: help
 
-all: verify-vendor format build test-short
+all: format build test-short
 
 env-up:           ## Start MySQL and copy ssl certificates to /tmp
 	@docker-compose up -d
@@ -52,7 +52,6 @@ test:             ## Run all tests
 verify-vendor:    ## Ensure that vendor/ is in sync with code and Gopkg.toml/lock
 	@echo ">> ensure that vendor/ is in sync with code and Gopkg.toml/lock"
 	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	dep check
 
 format:           ## Format the code
 	@echo ">> formatting code"
