@@ -35,6 +35,7 @@ jobs:
         include:
           - go-version: tip
             os: ubuntu-latest
+            mysql-image: percona:8.0
             may-fail: true
     runs-on: ubuntu-latest
     # The environment this job references
