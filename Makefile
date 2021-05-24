@@ -49,11 +49,6 @@ test:             ## Run all tests
 	@echo ">> running tests"
 	@$(GO) test -race $(pkgs)
 
-verify-vendor:    ## Ensure that vendor/ is in sync with code and Gopkg.toml/lock
-	@echo ">> ensure that vendor/ is in sync with code and Gopkg.toml/lock"
-	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	dep check
-
 format:           ## Format the code
 	@echo ">> formatting code"
 	@$(GO) fmt $(pkgs)
@@ -84,7 +79,7 @@ promu:            ## Install promu
 	@GOOS=$(shell uname -s | tr A-Z a-z) \
 		GO111MODULE=on \
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
-		$(GO) get -u github.com/prometheus/promu
+		$(GO) build -modfile=tools/go.mod -o bin/promu github.com/prometheus/promu
 
 help:             ## Display this help message.
 	@echo "$(TMPDIR)"
