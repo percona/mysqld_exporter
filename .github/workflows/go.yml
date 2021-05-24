@@ -64,13 +64,10 @@ jobs:
     - name: Run Tests
       run: |
         docker-compose up -d
+        make all
         make test
       env:
         MYSQL_IMAGE: ${{ matrix.mysql-image }}
-    - name: Build tarball
-      run: make tarball
-    - name: Build tarball
-      run: make docker
     - name: Run debug commands on failure
       if: ${{ failure() }}
       run: |
