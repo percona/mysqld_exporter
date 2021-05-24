@@ -8,8 +8,24 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.15
           - 1.16
+        mysql-image:
+          - mysql/mysql-server:5.5
+          - mysql/mysql-server:5.6
+          - mysql/mysql-server:5.7
+          - mysql/mysql-server:8.0
+          - mariadb:5.5
+          - mariadb:10.0
+          - mariadb:10.1
+          - mariadb:10.2
+          - mariadb:10.3
+          - percona/percona-server:5.6
+          - percona/percona-server:5.7
+          - percona/percona-server:8.0
+          - percona:5.5
+          - percona:5.6
+          - percona:5.7
+          - percona:8.0
         include:
           - go-version: tip
             os: ubuntu-latest
@@ -46,7 +62,11 @@ jobs:
         bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
         bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
     - name: Run Tests
-      run: make test
+      run: |
+        docker-compose up -d
+        make test
+      env:
+        MYSQL_IMAGE: ${{ matrix.mysql-image }}
     - name: Build tarball
       run: make tarball
     - name: Build tarball
@@ -59,3 +79,5 @@ jobs:
         go env
         pwd
         git status
+        docker --version
+        docker-compose --version
