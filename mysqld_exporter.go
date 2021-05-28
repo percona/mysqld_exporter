@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-  "sync/atomic"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -264,33 +264,33 @@ func init() {
 
 func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []collector.Scraper, defaultGatherer bool) http.HandlerFunc {
 	var processing_lr, processing_mr, processing_hr uint32 = 0, 0, 0 // default value is already 0, but for extra clarity
-  return func(w http.ResponseWriter, r *http.Request) {
-    start := time.Now()
-    query_collect := r.URL.Query().Get("collect[]")
-    switch query_collect {
-    case "custom_query.hr":
-      if !atomic.CompareAndSwapUint32(&processing_hr, 0, 1) {
-        log.Warnf("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
-        http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
-        return
-      }
-      defer atomic.StoreUint32(&processing_hr, 0)
-    case "custom_query.mr":
-      if !atomic.CompareAndSwapUint32(&processing_mr, 0, 1) {
-        log.Warnf("Received metrics MR request while previous still in progress: returning 429 Too Many Requests")
-        http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
-        return
-      }
-      defer atomic.StoreUint32(&processing_mr, 0)
-    case "custom_query.lr":
-      if !atomic.CompareAndSwapUint32(&processing_lr, 0, 1) {
-        log.Warnf("Received metrics LR request while previous still in progress: returning 429 Too Many Requests")
-        http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
-        return
-      }
-      defer atomic.StoreUint32(&processing_lr, 0)
-    }
-    defer func() { log.Debugf("Request elapsed time: %v %s", time.Since(start), query_collect) }()
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		query_collect := r.URL.Query().Get("collect[]")
+		switch query_collect {
+		case "custom_query.hr":
+			if !atomic.CompareAndSwapUint32(&processing_hr, 0, 1) {
+				log.Warnf("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
+				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+			defer atomic.StoreUint32(&processing_hr, 0)
+		case "custom_query.mr":
+			if !atomic.CompareAndSwapUint32(&processing_mr, 0, 1) {
+				log.Warnf("Received metrics MR request while previous still in progress: returning 429 Too Many Requests")
+				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+			defer atomic.StoreUint32(&processing_mr, 0)
+		case "custom_query.lr":
+			if !atomic.CompareAndSwapUint32(&processing_lr, 0, 1) {
+				log.Warnf("Received metrics LR request while previous still in progress: returning 429 Too Many Requests")
+				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+			defer atomic.StoreUint32(&processing_lr, 0)
+		}
+		defer func() { log.Debugf("Request elapsed time: %v %s", time.Since(start), query_collect) }()
 
 		filteredScrapers := scrapers
 		params := r.URL.Query()["collect[]"]
