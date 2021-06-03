@@ -2,6 +2,8 @@
 /mysqld_exporter
 /.release
 /.tarballs
+.vscode/
+bin/
 
 *.tar.gz
 *.test

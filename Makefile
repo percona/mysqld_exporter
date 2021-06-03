@@ -13,8 +13,8 @@
 
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
-PROMU        := $(FIRST_GOPATH)/bin/promu
-pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
+PROMU        := bin/promu
+pkgs          = $(shell $(GO) list ./...)
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
@@ -24,7 +24,7 @@ TMPDIR              ?= $(shell dirname $(shell mktemp)/)
 
 default: help
 
-all: verify-vendor format build test-short
+all: format build test-short
 
 env-up:           ## Start MySQL and copy ssl certificates to /tmp
 	@docker-compose up -d
@@ -39,7 +39,7 @@ env-down:         ## Stop MySQL and clean up certs
 
 style:            ## Check the code style
 	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+	@! gofmt -d $(shell find . -name '*.go' -print) | grep '^'
 
 test-short:       ## Run short tests
 	@echo ">> running short tests"
@@ -49,16 +49,11 @@ test:             ## Run all tests
 	@echo ">> running tests"
 	@$(GO) test -race $(pkgs)
 
-verify-vendor:    ## Ensure that vendor/ is in sync with code and Gopkg.toml/lock
-	@echo ">> ensure that vendor/ is in sync with code and Gopkg.toml/lock"
-	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	dep check
-
 format:           ## Format the code
 	@echo ">> formatting code"
 	@$(GO) fmt $(pkgs)
 
-FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+FILES = $(shell find . -type f -name '*.go'")
 
 fumpt:            ## Format source code using fumpt and fumports.
 	@gofumpt -w -s $(FILES)
@@ -84,7 +79,7 @@ promu:            ## Install promu
 	@GOOS=$(shell uname -s | tr A-Z a-z) \
 		GO111MODULE=on \
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
-		$(GO) get -u github.com/prometheus/promu
+		$(GO) build -modfile=tools/go.mod -o bin/promu github.com/prometheus/promu
 
 help:             ## Display this help message.
 	@echo "$(TMPDIR)"
