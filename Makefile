@@ -53,7 +53,7 @@ format:           ## Format the code
 	@echo ">> formatting code"
 	@$(GO) fmt $(pkgs)
 
-FILES = $(shell find . -type f -name '*.go'")
+FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 fumpt:            ## Format source code using fumpt and fumports.
 	@gofumpt -w -s $(FILES)

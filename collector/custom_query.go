@@ -247,7 +247,7 @@ func addQueries(content []byte, exporterMap map[string]MetricMapNamespace, custo
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
 func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map[string]MetricMapNamespace) {
-	var metricMap = make(map[string]MetricMapNamespace)
+	metricMap := make(map[string]MetricMapNamespace)
 	for namespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
 		// Get the constant labels.
