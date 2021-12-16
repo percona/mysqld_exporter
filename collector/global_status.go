@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -30,6 +31,7 @@ var replLatencyMap = []string{
 // Regexp to match various groups of status vars.
 var globalStatusRE = regexp.MustCompile(`^(com|handler|connection_errors|innodb_buffer_pool_pages|innodb_rows|performance_schema)_(.*)$`)
 
+// Metric descriptors.
 var (
 	globalCommandsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, globalStatus, "commands_total"),
@@ -51,6 +53,11 @@ var (
 		"Innodb buffer pool pages by state.",
 		[]string{"state"}, nil,
 	)
+	globalBufferPoolDirtyPagesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, globalStatus, "buffer_pool_dirty_pages"),
+		"Innodb buffer pool dirty pages.",
+		[]string{}, nil,
+	)
 	globalBufferPoolPageChangesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, globalStatus, "buffer_pool_page_changes_total"),
 		"Innodb buffer pool page state changes.",
@@ -71,12 +78,12 @@ var (
 // ScrapeGlobalStatus collects from `SHOW GLOBAL STATUS`.
 type ScrapeGlobalStatus struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeGlobalStatus) Name() string {
 	return globalStatus
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeGlobalStatus) Help() string {
 	return "Collect from SHOW GLOBAL STATUS"
 }
@@ -86,8 +93,8 @@ func (ScrapeGlobalStatus) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	globalStatusRows, err := db.QueryContext(ctx, globalStatusQuery)
 	if err != nil {
 		return err
@@ -133,10 +140,16 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 				)
 			case "innodb_buffer_pool_pages":
 				switch match[2] {
-				case "data", "dirty", "free", "misc", "old", "total":
+				case "data", "free", "misc", "old", "total":
 					ch <- prometheus.MustNewConstMetric(
 						globalBufferPoolPagesDesc, prometheus.GaugeValue, floatVal, match[2],
 					)
+				case "dirty":
+					ch <- prometheus.MustNewConstMetric(
+						globalBufferPoolDirtyPagesDesc, prometheus.GaugeValue, floatVal,
+					)
+				case "total":
+					continue
 				default:
 					ch <- prometheus.MustNewConstMetric(
 						globalBufferPoolPageChangesDesc, prometheus.CounterValue, floatVal, match[2],
@@ -165,21 +178,40 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 		)
 	}
 
+	// mysql_galera_evs_repl_latency
 	if textItems["wsrep_evs_repl_latency"] != "" {
-		galeraReplLatencyArray := strings.Split(textItems["wsrep_evs_repl_latency"], "/")
 
-		// check if galeraReplLatencyArray contains all needed values
-		if len(galeraReplLatencyArray) == len(replLatencyMap) {
-			galeraReplLatencyDesc := prometheus.NewDesc(
-				prometheus.BuildFQName(namespace, globalStatus, "wsrep_evs_repl_latency"),
-				"PXC/Galera replication latency on group communication.",
-				[]string{"aggregator"}, nil,
-			)
-			for index, label := range replLatencyMap {
-				if floatVal, err := strconv.ParseFloat(galeraReplLatencyArray[index], 64); err == nil {
-					ch <- prometheus.MustNewConstMetric(
-						galeraReplLatencyDesc, prometheus.GaugeValue, floatVal, label,
-					)
+		type evsValue struct {
+			name  string
+			value float64
+			index int
+			help  string
+		}
+
+		evsMap := []evsValue{
+			evsValue{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
+			evsValue{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
+			evsValue{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
+			evsValue{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
+			evsValue{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
+		}
+
+		evsParsingSuccess := true
+		values := strings.Split(textItems["wsrep_evs_repl_latency"], "/")
+
+		if len(evsMap) == len(values) {
+			for i, v := range evsMap {
+				evsMap[i].value, err = strconv.ParseFloat(values[v.index], 64)
+				if err != nil {
+					evsParsingSuccess = false
+				}
+			}
+
+			if evsParsingSuccess {
+				for _, v := range evsMap {
+					key := prometheus.BuildFQName(namespace, "galera_evs_repl_latency", v.name)
+					desc := prometheus.NewDesc(key, v.help, []string{}, nil)
+					ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v.value)
 				}
 			}
 		}
@@ -187,3 +219,6 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeGlobalStatus{}

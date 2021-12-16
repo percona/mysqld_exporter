@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -92,12 +94,12 @@ func processQueryResponseTimeTable(ctx context.Context, db *sql.DB, ch chan<- pr
 // ScrapeQueryResponseTime collects from `information_schema.query_response_time`.
 type ScrapeQueryResponseTime struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeQueryResponseTime) Name() string {
 	return "info_schema.query_response_time"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeQueryResponseTime) Help() string {
 	return "Collect query response time distribution if query_response_time_stats is ON."
 }
@@ -107,8 +109,8 @@ func (ScrapeQueryResponseTime) Version() float64 {
 	return 5.5
 }
 
-// Scrape collects data.
-func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	var activeQueryResponseTimePlugins uint8
 	// to reduce amount of erros by getting query_response_time_stats variable
 	// check if query_response_time.so plugin is loaded and active
@@ -127,11 +129,11 @@ func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<-
 	var queryStats uint8
 	err = db.QueryRowContext(ctx, queryResponseCheckQuery).Scan(&queryStats)
 	if err != nil {
-		log.Debugln("Query response time distribution is not present.")
+		level.Debug(logger).Log("msg", "Query response time distribution is not available.")
 		return nil
 	}
 	if queryStats == 0 {
-		log.Debugln("query_response_time_stats is OFF.")
+		level.Debug(logger).Log("msg", "MySQL variable is OFF.", "var", "query_response_time_stats")
 		return nil
 	}
 
@@ -145,3 +147,6 @@ func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<-
 	}
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeQueryResponseTime{}

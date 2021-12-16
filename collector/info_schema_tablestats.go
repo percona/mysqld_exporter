@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -20,6 +22,7 @@ const tableStatQuery = `
 		  FROM information_schema.table_statistics
 		`
 
+// Metric descriptors.
 var (
 	infoSchemaTableStatsRowsReadDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, informationSchema, "table_statistics_rows_read_total"),
@@ -41,12 +44,12 @@ var (
 // ScrapeTableStat collects from `information_schema.table_statistics`.
 type ScrapeTableStat struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeTableStat) Name() string {
 	return "info_schema.tablestats"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeTableStat) Help() string {
 	return "If running with userstat=1, set to true to collect table statistics"
 }
@@ -56,16 +59,16 @@ func (ScrapeTableStat) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeTableStat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeTableStat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	var varName, varVal string
 	err := db.QueryRowContext(ctx, userstatCheckQuery).Scan(&varName, &varVal)
 	if err != nil {
-		log.Debugln("Detailed table stats are not available.")
+		level.Debug(logger).Log("msg", "Detailed table stats are not available.")
 		return nil
 	}
 	if varVal == "OFF" {
-		log.Debugf("MySQL @@%s is OFF.", varName)
+		level.Debug(logger).Log("msg", "MySQL variable is OFF.", "var", varName)
 		return nil
 	}
 
@@ -109,3 +112,6 @@ func (ScrapeTableStat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometh
 	}
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeTableStat{}

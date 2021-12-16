@@ -16,13 +16,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
+	"github.com/go-sql-driver/mysql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/percona/exporter_shared"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
+	"github.com/prometheus/exporter-toolkit/web"
+	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
@@ -38,6 +44,7 @@ const (
 )
 
 var (
+	webConfig     = webflag.AddFlags(kingpin.CommandLine)
 	showVersion = kingpin.Flag(
 		"version",
 		"Print version information.",
@@ -58,6 +65,10 @@ var (
 		"config.my-cnf",
 		"Path to .my.cnf file to read MySQL credentials from.",
 	).Default(path.Join(os.Getenv("HOME"), ".my.cnf")).String()
+	tlsInsecureSkipVerify = kingpin.Flag(
+		"tls.insecure-skip-verify",
+		"Ignore certificate and server verification when using a tls connection.",
+	).Bool()
 
 	exporterLockTimeout = kingpin.Flag(
 		"exporter.lock_wait_timeout",
@@ -138,6 +149,7 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeGlobalVariables{}:                     false,
 	collector.ScrapeSlaveStatus{}:                         false,
 	collector.ScrapeProcesslist{}:                         false,
+	collector.ScrapeUser{}:                                false,
 	collector.ScrapeTableSchema{}:                         false,
 	collector.ScrapeInfoSchemaInnodbTablespaces{}:         false,
 	collector.ScrapeInnodbMetrics{}:                       false,
@@ -147,63 +159,26 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapePerfIndexIOWaits{}:                    false,
 	collector.ScrapePerfTableLockWaits{}:                  false,
 	collector.ScrapePerfEventsStatements{}:                false,
+	collector.ScrapePerfEventsStatementsSum{}:             false,
 	collector.ScrapePerfEventsWaits{}:                     false,
 	collector.ScrapePerfFileEvents{}:                      false,
 	collector.ScrapePerfFileInstances{}:                   false,
+	collector.ScrapePerfMemoryEvents{}:                    false,
+	collector.ScrapePerfReplicationGroupMembers{}:         false,
+	collector.ScrapePerfReplicationGroupMemberStats{}:     false,
+	collector.ScrapePerfReplicationApplierStatsByWorker{}: false,
 	collector.ScrapeUserStat{}:                            false,
 	collector.ScrapeClientStat{}:                          false,
 	collector.ScrapeTableStat{}:                           false,
+	collector.ScrapeSchemaStat{}:                          false,
+	collector.ScrapeInnodbCmp{}:                           false,
+	collector.ScrapeInnodbCmpMem{}:                        false,
 	collector.ScrapeQueryResponseTime{}:                   false,
 	collector.ScrapeEngineTokudbStatus{}:                  false,
 	collector.ScrapeEngineInnodbStatus{}:                  false,
 	collector.ScrapeHeartbeat{}:                           false,
-	collector.ScrapeInnodbCmp{}:                           false,
-	collector.ScrapeInnodbCmpMem{}:                        false,
-	collector.ScrapeCustomQuery{Resolution: collector.HR}: false,
-	collector.ScrapeCustomQuery{Resolution: collector.MR}: false,
-	collector.ScrapeCustomQuery{Resolution: collector.LR}: false,
-	collector.NewStandardGo():                             false,
-	collector.NewStandardProcess():                        false,
-}
-
-// TODO Remove
-var scrapersHr = map[collector.Scraper]struct{}{
-	collector.ScrapeGlobalStatus{}:                        {},
-	collector.ScrapeInnodbMetrics{}:                       {},
-	collector.ScrapeCustomQuery{Resolution: collector.HR}: {},
-}
-
-// TODO Remove
-var scrapersMr = map[collector.Scraper]struct{}{
-	collector.ScrapeSlaveStatus{}:                         {},
-	collector.ScrapeProcesslist{}:                         {},
-	collector.ScrapePerfEventsWaits{}:                     {},
-	collector.ScrapePerfFileEvents{}:                      {},
-	collector.ScrapePerfTableLockWaits{}:                  {},
-	collector.ScrapeQueryResponseTime{}:                   {},
-	collector.ScrapeEngineInnodbStatus{}:                  {},
-	collector.ScrapeInnodbCmp{}:                           {},
-	collector.ScrapeInnodbCmpMem{}:                        {},
-	collector.ScrapeCustomQuery{Resolution: collector.MR}: {},
-}
-
-// TODO Remove
-var scrapersLr = map[collector.Scraper]struct{}{
-	collector.ScrapeGlobalVariables{}:                     {},
-	collector.ScrapeTableSchema{}:                         {},
-	collector.ScrapeAutoIncrementColumns{}:                {},
-	collector.ScrapeBinlogSize{}:                          {},
-	collector.ScrapePerfTableIOWaits{}:                    {},
-	collector.ScrapePerfIndexIOWaits{}:                    {},
-	collector.ScrapePerfFileInstances{}:                   {},
-	collector.ScrapeUserStat{}:                            {},
-	collector.ScrapeTableStat{}:                           {},
-	collector.ScrapePerfEventsStatements{}:                {},
-	collector.ScrapeClientStat{}:                          {},
-	collector.ScrapeInfoSchemaInnodbTablespaces{}:         {},
-	collector.ScrapeEngineTokudbStatus{}:                  {},
-	collector.ScrapeHeartbeat{}:                           {},
-	collector.ScrapeCustomQuery{Resolution: collector.LR}: {},
+	collector.ScrapeSlaveHosts{}:                          false,
+	collector.ScrapeReplicaHost{}:                         false,
 }
 
 func parseMycnf(config interface{}) (string, error) {
@@ -218,55 +193,80 @@ func parseMycnf(config interface{}) (string, error) {
 	}
 	user := cfg.Section("client").Key("user").String()
 	password := cfg.Section("client").Key("password").String()
-	if (user == "") || (password == "") {
-		return dsn, fmt.Errorf("no user or password specified under [client] in %s", config)
+	if user == "" {
+		return dsn, fmt.Errorf("no user specified under [client] in %s", config)
 	}
 	host := cfg.Section("client").Key("host").MustString("localhost")
 	port := cfg.Section("client").Key("port").MustUint(3306)
 	socket := cfg.Section("client").Key("socket").String()
-	if socket != "" {
-		dsn = fmt.Sprintf("%s:%s@unix(%s)/", user, password, socket)
-	} else {
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/", user, password, host, port)
-	}
-
 	sslCA := cfg.Section("client").Key("ssl-ca").String()
 	sslCert := cfg.Section("client").Key("ssl-cert").String()
 	sslKey := cfg.Section("client").Key("ssl-key").String()
-	if sslCA != "" || (sslCert != "" && sslKey != "") {
+	passwordPart := ""
+	if password != "" {
+		passwordPart = ":" + password
+	} else {
+		if sslKey == "" {
+			return dsn, fmt.Errorf("password or ssl-key should be specified under [client] in %s", config)
+		}
+	}
+	if socket != "" {
+		dsn = fmt.Sprintf("%s%s@unix(%s)/", user, passwordPart, socket)
+	} else {
+		dsn = fmt.Sprintf("%s%s@tcp(%s:%d)/", user, passwordPart, host, port)
+	}
+	if sslCA != "" {
 		if tlsErr := customizeTLS(sslCA, sslCert, sslKey); tlsErr != nil {
 			tlsErr = fmt.Errorf("failed to register a custom TLS configuration for mysql dsn: %s", tlsErr)
 			return dsn, tlsErr
 		}
-		dsn, err = setTLSConfig(dsn)
-		if err != nil {
-			return "", errors.Wrap(err, "cannot set TLS configuration")
-		}
+		dsn = fmt.Sprintf("%s?tls=custom", dsn)
 	}
 
 	log.Debugln(dsn)
 	return dsn, nil
 }
 
-func setTLSConfig(dsn string) (string, error) {
-	cfg, err := mysql.ParseDSN(dsn)
+func customizeTLS(sslCA string, sslCert string, sslKey string) error {
+	var tlsCfg tls.Config
+	caBundle := x509.NewCertPool()
+	pemCA, err := ioutil.ReadFile(sslCA)
 	if err != nil {
-		return "", err
+		return err
 	}
-	cfg.TLSConfig = "custom"
-
-	return cfg.FormatDSN(), nil
+	if ok := caBundle.AppendCertsFromPEM(pemCA); ok {
+		tlsCfg.RootCAs = caBundle
+	} else {
+		return fmt.Errorf("failed parse pem-encoded CA certificates from %s", sslCA)
+	}
+	if sslCert != "" && sslKey != "" {
+		certPairs := make([]tls.Certificate, 0, 1)
+		keypair, err := tls.LoadX509KeyPair(sslCert, sslKey)
+		if err != nil {
+			return fmt.Errorf("failed to parse pem-encoded SSL cert %s or SSL key %s: %s",
+				sslCert, sslKey, err)
+		}
+		certPairs = append(certPairs, keypair)
+		tlsCfg.Certificates = certPairs
+		tlsCfg.InsecureSkipVerify = *tlsInsecureSkipVerify
+	}
+	mysql.RegisterTLSConfig("custom", &tlsCfg)
+	return nil
 }
 
 func init() {
 	prometheus.MustRegister(version.NewCollector("mysqld_exporter"))
 }
 
-func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []collector.Scraper, defaultGatherer bool) http.HandlerFunc {
+func newHandler(metrics collector.Metrics, scrapers []collector.Scraper, logger log.Logger) http.HandlerFunc {
 	var processing_lr, processing_mr, processing_hr uint32 = 0, 0, 0 // default value is already 0, but for extra clarity
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		defer func() { log.Debugf("Request elapsed time: %v %s", time.Since(start), query_collect) }()
+
 		query_collect := r.URL.Query().Get("collect[]")
+		filteredScrapers := scrapers
+		params := r.URL.Query()["collect[]"]
 		switch query_collect {
 		case "custom_query.hr":
 			if !atomic.CompareAndSwapUint32(&processing_hr, 0, 1) {
@@ -290,7 +290,6 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 			}
 			defer atomic.StoreUint32(&processing_lr, 0)
 		}
-		defer func() { log.Debugf("Request elapsed time: %v %s", time.Since(start), query_collect) }()
 
 		filteredScrapers := scrapers
 		params := r.URL.Query()["collect[]"]
@@ -300,15 +299,11 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 		if v := r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"); v != "" {
 			timeoutSeconds, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				log.Errorf("Failed to parse timeout from Prometheus header: %s", err)
+				level.Error(logger).Log("msg", "Failed to parse timeout from Prometheus header", "err", err)
 			} else {
 				if *timeoutOffset >= timeoutSeconds {
 					// Ignore timeout offset if it doesn't leave time to scrape.
-					log.Errorf(
-						"Timeout offset (--timeout-offset=%.2f) should be lower than prometheus scrape time (X-Prometheus-Scrape-Timeout-Seconds=%.2f).",
-						*timeoutOffset,
-						timeoutSeconds,
-					)
+					level.Error(logger).Log("msg", "Timeout offset should be lower than prometheus scrape timeout", "offset", *timeoutOffset, "prometheus_scrape_timeout", timeoutSeconds)
 				} else {
 					// Subtract timeout offset from timeout.
 					timeoutSeconds -= *timeoutOffset
@@ -321,7 +316,7 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 				r = r.WithContext(ctx)
 			}
 		}
-		log.Debugln("collect query:", params)
+		level.Debug(logger).Log("msg", "collect[] params", "params", strings.Join(params, ","))
 
 		// Check if we have some "collect[]" query parameters.
 		if len(params) > 0 {
@@ -352,7 +347,7 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 		}
 
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(collector.New(ctx, db, metrics, filteredScrapers))
+		registry.MustRegister(collector.New(ctx, dsn, metrics, filteredScrapers, logger))
 
 		gatherers := prometheus.Gatherers{}
 		if defaultGatherer {
@@ -378,16 +373,26 @@ func main() {
 	// Generate ON/OFF flags for all scrapers.
 	scraperFlags := map[collector.Scraper]*bool{}
 	for scraper, enabledByDefault := range scrapers {
+		defaultOn := "false"
+		if enabledByDefault {
+			defaultOn = "true"
+		}
+
 		f := kingpin.Flag(
 			"collect."+scraper.Name(),
 			scraper.Help(),
-		).Default(strconv.FormatBool(enabledByDefault)).Bool()
+		).Default(defaultOn).Bool()
 
 		scraperFlags[scraper] = f
 	}
 
 	// Parse flags.
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	kingpin.Version(version.Print("mysqld_exporter"))
+	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
+	logger := promlog.New(promlogConfig)
 
 	if *showVersion {
 		fmt.Fprintln(os.Stdout, version.Print("mysqld_exporter"))
@@ -413,17 +418,17 @@ func main() {
 </html>
 `)
 
-	log.Infoln("Starting mysqld_exporter", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	level.Info(logger).Log("msg", "Starting mysqld_exporter", "version", version.Info())
+	level.Info(logger).Log("msg", "Build context", version.BuildContext())
 
-	// Get DSN.
 	dsn = os.Getenv("DATA_SOURCE_NAME")
 	if len(dsn) == 0 {
 		var err error
 		if dsn, err = parseMycnf(*configMycnf); err != nil {
-			log.Fatal(err)
+			level.Info(logger).Log("msg", "Error parsing my.cnf", "file", *configMycnf, "err", err)
 
-			return
+			//TODO:X1: or return?? [diff]
+			os.Exit(1)
 		}
 	}
 
@@ -519,6 +524,27 @@ func main() {
 		log.Infoln("HTTPS/TLS is enabled")
 	}
 
+	// Register only scrapers enabled by flag.
+	enabledScrapers := []collector.Scraper{}
+	for scraper, enabled := range scraperFlags {
+		if *enabled {
+			level.Info(logger).Log("msg", "Scraper enabled", "scraper", scraper.Name())
+			enabledScrapers = append(enabledScrapers, scraper)
+		}
+	}
+	handlerFunc := newHandler(collector.NewMetrics(), enabledScrapers, logger)
+	http.Handle(*metricPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handlerFunc))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(landingPage)
+	})
+
+	level.Info(logger).Log("msg", "Listening on address", "address", *listenAddress)
+	srv := &http.Server{Addr: *listenAddress}
+	if err := web.ListenAndServe(srv, *webConfig, logger); err != nil {
+		level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
+		os.Exit(1)
+	}
+
 	// Use default mux for /debug/vars and /debug/pprof
 	mux := http.DefaultServeMux
 
@@ -583,6 +609,20 @@ func main() {
 
 		log.Fatal(srv.ListenAndServe())
 	}
+
+}
+
+func newDB(dsn string) (*sql.DB, error) {
+	// Validate DSN, and open connection pool.
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(*exporterMaxOpenConns)
+	db.SetMaxIdleConns(*exporterMaxIdleConns)
+	db.SetConnMaxLifetime(*exporterConnMaxLifetime)
+
+	return db, nil
 }
 
 func enabledScrapers(scraperFlags map[collector.Scraper]*bool) (all, hr, mr, lr []collector.Scraper) {
@@ -604,53 +644,4 @@ func enabledScrapers(scraperFlags map[collector.Scraper]*bool) (all, hr, mr, lr 
 	}
 
 	return all, hr, mr, lr
-}
-
-func newDB(dsn string) (*sql.DB, error) {
-	// Validate DSN, and open connection pool.
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(*exporterMaxOpenConns)
-	db.SetMaxIdleConns(*exporterMaxIdleConns)
-	db.SetConnMaxLifetime(*exporterConnMaxLifetime)
-
-	return db, nil
-}
-
-func customizeTLS(sslCA string, sslCert string, sslKey string) error {
-	var tlsCfg tls.Config
-	caBundle := x509.NewCertPool()
-
-	if sslCA != "" && (sslCert == "" || sslKey == "") {
-		return fmt.Errorf("missing certificates. Cannot specify only SSL CA file")
-	}
-
-	// CA is not mandatory. It is OK if we only have ssl-cert and ssl-key.
-	if sslCA != "" {
-		pemCA, err := ioutil.ReadFile(filepath.Clean(sslCA))
-		if err != nil {
-			return err
-		}
-		if ok := caBundle.AppendCertsFromPEM(pemCA); ok {
-			tlsCfg.RootCAs = caBundle
-		} else {
-			return errors.Wrapf(err, "failed parse pem-encoded CA certificates from %s", sslCA)
-		}
-	}
-
-	if sslCert != "" && sslKey != "" {
-		certPairs := make([]tls.Certificate, 0, 1)
-		keypair, err := tls.LoadX509KeyPair(sslCert, sslKey)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse pem-encoded SSL cert %s or SSL key %s", sslCert, sslKey)
-		}
-
-		certPairs = append(certPairs, keypair)
-		tlsCfg.Certificates = certPairs
-		tlsCfg.InsecureSkipVerify = *mysqlSSLSkipVerify
-	}
-
-	return mysql.RegisterTLSConfig("custom", &tlsCfg)
 }

@@ -8,26 +8,44 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const infoSchemaProcesslistQuery = `
-		SELECT COALESCE(command,''),COALESCE(state,''),count(*),sum(time)
+		  SELECT
+		    user,
+		    SUBSTRING_INDEX(host, ':', 1) AS host,
+		    COALESCE(command,'') AS command,
+		    COALESCE(state,'') AS state,
+		    count(*) AS processes,
+		    sum(time) AS seconds
 		  FROM information_schema.processlist
 		  WHERE ID != connection_id()
 		    AND TIME >= %d
-		  GROUP BY command,state
+		  GROUP BY user,SUBSTRING_INDEX(host, ':', 1),command,state
 		  ORDER BY null
 		`
 
+// Tunable flags.
 var (
-	// Tunable flags.
 	processlistMinTime = kingpin.Flag(
 		"collect.info_schema.processlist.min_time",
 		"Minimum time a thread must be in each state to be counted",
 	).Default("0").Int()
-	// Prometheus descriptors.
+	processesByUserFlag = kingpin.Flag(
+		"collect.info_schema.processlist.processes_by_user",
+		"Enable collecting the number of processes by user",
+	).Default("true").Bool()
+	processesByHostFlag = kingpin.Flag(
+		"collect.info_schema.processlist.processes_by_host",
+		"Enable collecting the number of processes by host",
+	).Default("true").Bool()
+)
+
+// Metric descriptors.
+var (
 	processlistCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, informationSchema, "threads"),
 		"The number of threads (connections) split by current state.",
@@ -36,6 +54,14 @@ var (
 		prometheus.BuildFQName(namespace, informationSchema, "threads_seconds"),
 		"The number of seconds threads (connections) have used split by current state.",
 		[]string{"state"}, nil)
+	processesByUserDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, informationSchema, "processes_by_user"),
+		"The number of processes by user.",
+		[]string{"mysql_user"}, nil)
+	processesByHostDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, informationSchema, "processes_by_host"),
+		"The number of processes by host.",
+		[]string{"client_host"}, nil)
 )
 
 // whitelist for connection/process states in SHOW PROCESSLIST
@@ -97,8 +123,8 @@ var (
 		"other":                     uint32(0),
 	}
 	threadStateMapping = map[string]string{
-		"user sleep":     "idle",
-		"creating index": "altering table",
+		"user sleep":    							"idle",
+		"creating index": 							"altering table",
 		"committing alter table to storage engine": "altering table",
 		"discard or import tablespace":             "altering table",
 		"rename":                                   "altering table",
@@ -119,9 +145,90 @@ var (
 	}
 )
 
+// ScrapeProcesslist collects from `information_schema.processlist`.
+type ScrapeProcesslist struct{}
+
+// Name of the Scraper. Should be unique.
+func (ScrapeProcesslist) Name() string {
+	return informationSchema + ".processlist"
+}
+
+// Help describes the role of the Scraper.
+func (ScrapeProcesslist) Help() string {
+	return "Collect current thread state counts from the information_schema.processlist"
+}
+
+// Version of MySQL from which scraper is available.
+func (ScrapeProcesslist) Version() float64 {
+	return 5.1
+}
+
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeProcesslist) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+	processQuery := fmt.Sprintf(
+		infoSchemaProcesslistQuery,
+		*processlistMinTime,
+	)
+	processlistRows, err := db.QueryContext(ctx, processQuery)
+	if err != nil {
+		return err
+	}
+	defer processlistRows.Close()
+
+	var (
+		user      string
+		host      string
+		command   string
+		state     string
+		processes uint32
+		time      uint32
+	)
+	stateCounts := make(map[string]uint32, len(threadStateCounterMap))
+	stateTime := make(map[string]uint32, len(threadStateCounterMap))
+	hostCount := make(map[string]uint32)
+	userCount := make(map[string]uint32)
+	for k, v := range threadStateCounterMap {
+		stateCounts[k] = v
+		stateTime[k] = v
+	}
+
+	for processlistRows.Next() {
+		err = processlistRows.Scan(&user, &host, &command, &state, &processes, &time)
+		if err != nil {
+			return err
+		}
+		realState := deriveThreadState(command, state)
+		stateCounts[realState] += processes
+		stateTime[realState] += time
+		hostCount[host] = hostCount[host] + processes
+		userCount[user] = userCount[user] + processes
+	}
+
+	if *processesByHostFlag {
+		for host, processes := range hostCount {
+			ch <- prometheus.MustNewConstMetric(processesByHostDesc, prometheus.GaugeValue, float64(processes), host)
+		}
+	}
+
+	if *processesByUserFlag {
+		for user, processes := range userCount {
+			ch <- prometheus.MustNewConstMetric(processesByUserDesc, prometheus.GaugeValue, float64(processes), user)
+		}
+	}
+
+	for state, processes := range stateCounts {
+		ch <- prometheus.MustNewConstMetric(processlistCountDesc, prometheus.GaugeValue, float64(processes), state)
+	}
+	for state, time := range stateTime {
+		ch <- prometheus.MustNewConstMetric(processlistTimeDesc, prometheus.GaugeValue, float64(time), state)
+	}
+
+	return nil
+}
+
 func deriveThreadState(command string, state string) string {
-	normCmd := strings.Replace(strings.ToLower(command), "_", " ", -1)
-	normState := strings.Replace(strings.ToLower(state), "_", " ", -1)
+	var normCmd = strings.Replace(strings.ToLower(command), "_", " ", -1)
+	var normState = strings.Replace(strings.ToLower(state), "_", " ", -1)
 	// check if it's already a valid state
 	_, knownState := threadStateCounterMap[normState]
 	if knownState {
@@ -148,65 +255,5 @@ func deriveThreadState(command string, state string) string {
 	return "other"
 }
 
-// ScrapeProcesslist collects from `information_schema.processlist`.
-type ScrapeProcesslist struct{}
-
-// Name of the Scraper.
-func (ScrapeProcesslist) Name() string {
-	return informationSchema + ".processlist"
-}
-
-// Help returns additional information about Scraper.
-func (ScrapeProcesslist) Help() string {
-	return "Collect current thread state counts from the information_schema.processlist"
-}
-
-// Version of MySQL from which scraper is available.
-func (ScrapeProcesslist) Version() float64 {
-	return 5.1
-}
-
-// Scrape collects data.
-func (ScrapeProcesslist) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
-	processQuery := fmt.Sprintf(
-		infoSchemaProcesslistQuery,
-		*processlistMinTime,
-	)
-	processlistRows, err := db.QueryContext(ctx, processQuery)
-	if err != nil {
-		return err
-	}
-	defer processlistRows.Close()
-
-	var (
-		command string
-		state   string
-		count   uint32
-		time    uint32
-	)
-	stateCounts := make(map[string]uint32, len(threadStateCounterMap))
-	stateTime := make(map[string]uint32, len(threadStateCounterMap))
-	for k, v := range threadStateCounterMap {
-		stateCounts[k] = v
-		stateTime[k] = v
-	}
-
-	for processlistRows.Next() {
-		err = processlistRows.Scan(&command, &state, &count, &time)
-		if err != nil {
-			return err
-		}
-		realState := deriveThreadState(command, state)
-		stateCounts[realState] += count
-		stateTime[realState] += time
-	}
-
-	for state, count := range stateCounts {
-		ch <- prometheus.MustNewConstMetric(processlistCountDesc, prometheus.GaugeValue, float64(count), state)
-	}
-	for state, time := range stateTime {
-		ch <- prometheus.MustNewConstMetric(processlistTimeDesc, prometheus.GaugeValue, float64(time), state)
-	}
-
-	return nil
-}
+// check interface
+var _ Scraper = ScrapeProcesslist{}

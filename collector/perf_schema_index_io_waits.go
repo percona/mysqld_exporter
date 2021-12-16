@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -34,12 +35,12 @@ var (
 // ScrapePerfIndexIOWaits collects for `performance_schema.table_io_waits_summary_by_index_usage`.
 type ScrapePerfIndexIOWaits struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapePerfIndexIOWaits) Name() string {
 	return "perf_schema.indexiowaits"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapePerfIndexIOWaits) Help() string {
 	return "Collect metrics from performance_schema.table_io_waits_summary_by_index_usage"
 }
@@ -49,8 +50,8 @@ func (ScrapePerfIndexIOWaits) Version() float64 {
 	return 5.6
 }
 
-// Scrape collects data.
-func (ScrapePerfIndexIOWaits) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapePerfIndexIOWaits) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	perfSchemaIndexWaitsRows, err := db.QueryContext(ctx, perfIndexIOWaitsQuery)
 	if err != nil {
 		return err
@@ -112,3 +113,6 @@ func (ScrapePerfIndexIOWaits) Scrape(ctx context.Context, db *sql.DB, ch chan<- 
 	}
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapePerfIndexIOWaits{}

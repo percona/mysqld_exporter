@@ -6,36 +6,36 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"sync"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	innodbTablespacesQueryv57 = `
+const innodbTablespacesTablenameQuery = `
+	SELECT
+	    table_name
+	  FROM information_schema.tables
+	  WHERE table_name = 'INNODB_SYS_TABLESPACES'
+	    OR table_name = 'INNODB_TABLESPACES'
+	`
+const innodbTablespacesQuery = `
 	SELECT
 	    SPACE,
 	    NAME,
-	    ifnull(FILE_FORMAT, 'NONE') as FILE_FORMAT,
+	    ifnull((SELECT column_name
+			FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA = 'information_schema'
+			  AND TABLE_NAME = ` + "'%s'" + `
+			  AND COLUMN_NAME = 'FILE_FORMAT' LIMIT 1), 'NONE') as FILE_FORMAT,
 	    ifnull(ROW_FORMAT, 'NONE') as ROW_FORMAT,
 	    ifnull(SPACE_TYPE, 'NONE') as SPACE_TYPE,
 	    FILE_SIZE,
 	    ALLOCATED_SIZE
-	  FROM information_schema.innodb_sys_tablespaces
-	`
-	innodbTablespacesQueryv80 = `
-	SELECT
-	    SPACE,
-	    NAME,
-	    'NONE' as FILE_FORMAT,
-	    ifnull(ROW_FORMAT, 'NONE') as ROW_FORMAT,
-	    ifnull(SPACE_TYPE, 'NONE') as SPACE_TYPE,
-	    FILE_SIZE,
-	    ALLOCATED_SIZE
-	  FROM information_schema.innodb_tablespaces
-	`
-)
+	  FROM information_schema.` + "`%s`"
 
+// Metric descriptors.
 var (
 	infoSchemaInnodbTablesspaceInfoDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, informationSchema, "innodb_tablespace_space_info"),
@@ -60,12 +60,12 @@ var (
 // ScrapeInfoSchemaInnodbTablespaces collects from `information_schema.innodb_sys_tablespaces`.
 type ScrapeInfoSchemaInnodbTablespaces struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeInfoSchemaInnodbTablespaces) Name() string {
 	return informationSchema + ".innodb_tablespaces"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeInfoSchemaInnodbTablespaces) Help() string {
 	return "Collect metrics from information_schema.innodb_sys_tablespaces"
 }
@@ -75,13 +75,27 @@ func (ScrapeInfoSchemaInnodbTablespaces) Version() float64 {
 	return 5.7
 }
 
-// Scrape collects data.
-func (ScrapeInfoSchemaInnodbTablespaces) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeInfoSchemaInnodbTablespaces) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	doOnce.Do(func() {
 		setInnodbTablespacesQuery(ctx, db)
 	})
 
-	tablespacesRows, err := db.QueryContext(ctx, innodbTablespacesQuery)
+	var tablespacesTablename string
+	var query string
+	err := db.QueryRowContext(ctx, innodbTablespacesTablenameQuery).Scan(&tablespacesTablename)
+	if err != nil {
+		return err
+	}
+
+	switch tablespacesTablename {
+	case "INNODB_SYS_TABLESPACES", "INNODB_TABLESPACES":
+		query = fmt.Sprintf(innodbTablespacesQuery, tablespacesTablename, tablespacesTablename)
+	default:
+		return errors.New("Couldn't find INNODB_SYS_TABLESPACES or INNODB_TABLESPACES in information_schema.")
+	}
+
+	tablespacesRows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -147,3 +161,6 @@ func setInnodbTablespacesQuery(ctx context.Context, db *sql.DB) {
 		}
 	}
 }
+
+// check interface
+var _ Scraper = ScrapeInfoSchemaInnodbTablespaces{}

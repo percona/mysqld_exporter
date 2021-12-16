@@ -3,15 +3,23 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
 	"regexp"
 	"runtime/pprof"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 // Metric name parts.
@@ -20,9 +28,30 @@ const (
 	exporter = "exporter"
 )
 
-// SQL Queries.
+// SQL queries and parameters.
 const (
 	versionQuery = `SELECT @@version`
+
+	// System variable params formatting.
+	// See: https://github.com/go-sql-driver/mysql#system-variables
+	sessionSettingsParam = `log_slow_filter=%27tmp_table_on_disk,filesort_on_disk%27`
+	timeoutParam         = `lock_wait_timeout=%d`
+)
+
+var (
+	versionRE = regexp.MustCompile(`^\d+\.\d+`)
+)
+
+// Tunable flags.
+var (
+	exporterLockTimeout = kingpin.Flag(
+		"exporter.lock_wait_timeout",
+		"Set a lock_wait_timeout (in seconds) on the connection to avoid long metadata locking.",
+	).Default("2").Int()
+	slowLogFilter = kingpin.Flag(
+		"exporter.log_slow_filter",
+		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
+	).Default("false").Bool()
 )
 
 // Metric descriptors.
@@ -40,16 +69,32 @@ var _ prometheus.Collector = (*Exporter)(nil)
 // Exporter collects MySQL metrics. It implements prometheus.Collector.
 type Exporter struct {
 	ctx      context.Context
-	db       *sql.DB
+	logger   log.Logger
+	dsn      string
 	scrapers []Scraper
 	metrics  Metrics
 }
 
 // New returns a new MySQL exporter for the provided DSN.
-func New(ctx context.Context, db *sql.DB, metrics Metrics, scrapers []Scraper) *Exporter {
+func New(ctx context.Context, dsn string, metrics Metrics, scrapers []Scraper, logger log.Logger) *Exporter {
+	// Setup extra params for the DSN, default to having a lock timeout.
+	dsnParams := []string{fmt.Sprintf(timeoutParam, *exporterLockTimeout)}
+
+	if *slowLogFilter {
+		dsnParams = append(dsnParams, sessionSettingsParam)
+	}
+
+	if strings.Contains(dsn, "?") {
+		dsn = dsn + "&"
+	} else {
+		dsn = dsn + "?"
+	}
+	dsn += strings.Join(dsnParams, "&")
+
 	return &Exporter{
 		ctx:      ctx,
-		db:       db,
+		logger:   logger,
+		dsn:      dsn,
 		scrapers: scrapers,
 		metrics:  metrics,
 	}
@@ -74,46 +119,51 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
-	e.metrics.Error.Set(0)
 	e.metrics.TotalScrapes.Inc()
 	var err error
 
 	scrapeTime := time.Now()
-	if err = e.db.PingContext(ctx); err != nil {
-		// BUG(arvenil): PMM-2726: When PingContext returns with context deadline exceeded
-		// the subsequent call will return `bad connection`.
-		// https://github.com/go-sql-driver/mysql/issues/858
-		// The PingContext is called second time as a workaround for this issue.
-		if err = e.db.PingContext(ctx); err != nil {
-			log.Errorln("Error pinging mysqld:", err)
-			e.metrics.MySQLUp.Set(0)
-			e.metrics.Error.Set(1)
-			return
-		}
+	db, err := sql.Open("mysql", e.dsn)
+	if err != nil {
+		level.Error(e.logger).Log("msg", "Error opening connection to database", "err", err)
+		e.metrics.Error.Set(1)
+		return
 	}
+	defer db.Close()
+
+	// By design exporter should use maximum one connection per request.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	// Set max lifetime for a connection.
+	db.SetConnMaxLifetime(1 * time.Minute)
+
+	if err := db.PingContext(ctx); err != nil {
+		level.Error(e.logger).Log("msg", "Error pinging mysqld", "err", err)
+		e.metrics.MySQLUp.Set(0)
+		e.metrics.Error.Set(1)
+		return
+	}
+
 	e.metrics.MySQLUp.Set(1)
+	e.metrics.Error.Set(0)
 
 	ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, time.Since(scrapeTime).Seconds(), "connection")
 
-	versionNum := getMySQLVersion(ctx, e.db)
-	wg := &sync.WaitGroup{}
+	version := getMySQLVersion(db, e.logger)
+	var wg sync.WaitGroup
 	defer wg.Wait()
 	for _, scraper := range e.scrapers {
-		if versionNum < scraper.Version() {
+		if version < scraper.Version() {
 			continue
 		}
+
 		wg.Add(1)
 		go func(scraper Scraper) {
 			defer wg.Done()
-
-			defer pprof.SetGoroutineLabels(ctx)
-			scrapeCtx := pprof.WithLabels(ctx, pprof.Labels("scraper", scraper.Name()))
-			pprof.SetGoroutineLabels(scrapeCtx)
-
 			label := "collect." + scraper.Name()
 			scrapeTime := time.Now()
-			if err := scraper.Scrape(scrapeCtx, e.db, ch); err != nil {
-				log.Debugln("Error scraping for "+label+":", err)
+			if err := scraper.Scrape(ctx, db, ch, log.With(e.logger, "scraper", scraper.Name())); err != nil {
+				level.Error(e.logger).Log("msg", "Error from scraper", "scraper", scraper.Name(), "err", err)
 				e.metrics.ScrapeErrors.WithLabelValues(label).Inc()
 				e.metrics.Error.Set(1)
 			}
@@ -122,18 +172,17 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	}
 }
 
-func getMySQLVersion(ctx context.Context, db *sql.DB) float64 {
-	var (
-		versionStr string
-		versionNum float64
-	)
-	err := db.QueryRowContext(ctx, versionQuery).Scan(&versionStr)
-	if err == nil {
-		r, _ := regexp.Compile(`^\d+\.\d+`)
-		versionNum, _ = strconv.ParseFloat(r.FindString(versionStr), 64)
+func getMySQLVersion(db *sql.DB, logger log.Logger) float64 {
+	var versionStr string
+	var versionNum float64
+	if err := db.QueryRow(versionQuery).Scan(&versionStr); err == nil {
+		versionNum, _ = strconv.ParseFloat(versionRE.FindString(versionStr), 64)
+	} else {
+		level.Debug(logger).Log("msg", "Error querying version", "err", err)
 	}
-	// In case, we can't match/parse the version, let's set it to something big to it matches all the versions.
+	// If we can't match/parse the version, set it some big value that matches all versions.
 	if versionNum == 0 {
+		level.Debug(logger).Log("msg", "Error parsing version string", "version", versionStr)
 		versionNum = 999
 	}
 	return versionNum
@@ -148,11 +197,8 @@ type Metrics struct {
 }
 
 // NewMetrics creates new Metrics instance.
-func NewMetrics(resolution string) Metrics {
+func NewMetrics() Metrics {
 	subsystem := exporter
-	if resolution != "" {
-		subsystem = exporter + "_" + resolution
-	}
 	return Metrics{
 		TotalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,

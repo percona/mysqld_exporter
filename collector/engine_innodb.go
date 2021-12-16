@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -22,12 +23,12 @@ const (
 // ScrapeEngineInnodbStatus scrapes from `SHOW ENGINE INNODB STATUS`.
 type ScrapeEngineInnodbStatus struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeEngineInnodbStatus) Name() string {
 	return "engine_innodb_status"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeEngineInnodbStatus) Help() string {
 	return "Collect from SHOW ENGINE INNODB STATUS"
 }
@@ -37,8 +38,8 @@ func (ScrapeEngineInnodbStatus) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeEngineInnodbStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeEngineInnodbStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	rows, err := db.QueryContext(ctx, engineInnodbStatusQuery)
 	if err != nil {
 		return err
@@ -84,3 +85,6 @@ func (ScrapeEngineInnodbStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<
 
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeEngineInnodbStatus{}

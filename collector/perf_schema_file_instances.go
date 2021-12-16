@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -20,7 +21,7 @@ const perfFileInstancesQuery = `
 	     where FILE_NAME REGEXP ?
 	`
 
-// Metric descriptors.
+// Tunable flags.
 var (
 	performanceSchemaFileInstancesFilter = kingpin.Flag(
 		"collect.perf_schema.file_instances.filter",
@@ -31,7 +32,10 @@ var (
 		"collect.perf_schema.file_instances.remove_prefix",
 		"Remove path prefix in performance_schema.file_summary_by_instance",
 	).Default("/var/lib/mysql/").String()
+)
 
+// Metric descriptors.
+var (
 	performanceSchemaFileInstancesBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, performanceSchema, "file_instances_bytes"),
 		"The number of bytes processed by file read/write operations.",
@@ -47,12 +51,12 @@ var (
 // ScrapePerfFileInstances collects from `performance_schema.file_summary_by_instance`.
 type ScrapePerfFileInstances struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapePerfFileInstances) Name() string {
 	return "perf_schema.file_instances"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapePerfFileInstances) Help() string {
 	return "Collect metrics from performance_schema.file_summary_by_instance"
 }
@@ -62,8 +66,8 @@ func (ScrapePerfFileInstances) Version() float64 {
 	return 5.5
 }
 
-// Scrape collects data.
-func (ScrapePerfFileInstances) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapePerfFileInstances) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	// Timers here are returned in picoseconds.
 	perfSchemaFileInstancesRows, err := db.QueryContext(ctx, perfFileInstancesQuery, *performanceSchemaFileInstancesFilter)
 	if err != nil {
@@ -107,3 +111,6 @@ func (ScrapePerfFileInstances) Scrape(ctx context.Context, db *sql.DB, ch chan<-
 	}
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapePerfFileInstances{}

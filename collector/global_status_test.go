@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
 func TestScrapeGlobalStatus(t *testing.T) {
@@ -25,6 +26,7 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		AddRow("Connection_errors_internal", "4").
 		AddRow("Handler_commit", "5").
 		AddRow("Innodb_buffer_pool_pages_data", "6").
+		AddRow("Innodb_buffer_pool_pages_flushed", "7").
 		AddRow("Innodb_buffer_pool_pages_dirty", "7").
 		AddRow("Innodb_buffer_pool_pages_free", "8").
 		AddRow("Innodb_buffer_pool_pages_misc", "9").
@@ -44,12 +46,12 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		AddRow("wsrep_local_state_uuid", "6c06e583-686f-11e6-b9e3-8336ad58138c").
 		AddRow("wsrep_cluster_state_uuid", "6c06e583-686f-11e6-b9e3-8336ad58138c").
 		AddRow("wsrep_provider_version", "3.16(r5c765eb)").
-		AddRow("wsrep_evs_repl_latency", "0.0471057/0.0722181/0.0783635/0.0112616/6")
+		AddRow("wsrep_evs_repl_latency", "0.000227664/0.00034135/0.000544298/6.03708e-05/212")
 	mock.ExpectQuery(sanitizeQuery(globalStatusQuery)).WillReturnRows(rows)
 
 	ch := make(chan prometheus.Metric)
 	go func() {
-		if err = (ScrapeGlobalStatus{}).Scrape(context.Background(), db, ch); err != nil {
+		if err = (ScrapeGlobalStatus{}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)
@@ -62,12 +64,12 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		{labels: labelMap{"error": "internal"}, value: 4, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"handler": "commit"}, value: 5, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"state": "data"}, value: 6, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"state": "dirty"}, value: 7, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{"operation": "flushed"}, value: 7, metricType: dto.MetricType_COUNTER},
+		{labels: labelMap{}, value: 7, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"state": "free"}, value: 8, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"state": "misc"}, value: 9, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"state": "old"}, value: 10, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"state": "total"}, value: 11, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"operation": "flushed"}, value: 12, metricType: dto.MetricType_COUNTER},
+		{labels: labelMap{"state": "total_pages"}, value: 11, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"operation": "lru_flushed"}, value: 13, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"operation": "made_not_young"}, value: 14, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"operation": "made_young"}, value: 15, metricType: dto.MetricType_COUNTER},
@@ -78,11 +80,11 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		{labels: labelMap{}, value: 11, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{}, value: 1, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{"wsrep_local_state_uuid": "6c06e583-686f-11e6-b9e3-8336ad58138c", "wsrep_cluster_state_uuid": "6c06e583-686f-11e6-b9e3-8336ad58138c", "wsrep_provider_version": "3.16(r5c765eb)"}, value: 1, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"aggregator": "Minimum"}, value: 0.0471057, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"aggregator": "Average"}, value: 0.0722181, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"aggregator": "Maximum"}, value: 0.0783635, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"aggregator": "Standard Deviation"}, value: 0.0112616, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"aggregator": "Sample Size"}, value: 6, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 0.000227664, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 0.00034135, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 0.000544298, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 6.03708e-05, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 212, metricType: dto.MetricType_GAUGE},
 	}
 	convey.Convey("Metrics comparison", t, func() {
 		for _, expect := range counterExpected {
@@ -93,6 +95,6 @@ func TestScrapeGlobalStatus(t *testing.T) {
 
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expections: %s", err)
+		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
 }

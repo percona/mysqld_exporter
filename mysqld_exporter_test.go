@@ -1,3 +1,16 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -37,6 +50,14 @@ func TestParseMycnf(t *testing.T) {
 			password = abc123
 			port = 3308
 		`
+		clientAuthConfig = `
+			[client]
+			user = root
+			port = 3308
+			ssl-ca = ca.crt
+ 			ssl-cert = tls.crt
+ 			ssl-key = tls.key
+		`
 		socketConfig = `
 			[client]
 			user = user
@@ -59,6 +80,14 @@ func TestParseMycnf(t *testing.T) {
 			host = 1.2.3.4
 			port = 3307
 		`
+		ignoreBooleanKeys = `
+			[client]
+			user = root
+			password = abc123
+
+			[mysql]
+			skip-auto-rehash
+		`
 		badConfig = `
 			[client]
 			user = root
@@ -72,10 +101,7 @@ func TestParseMycnf(t *testing.T) {
 			[hello]
 			world = ismine
 		`
-		badConfig4 = `
-			[hello]
-			world
-		`
+		badConfig4 = `[hello`
 	)
 	convey.Convey("Various .my.cnf configurations", t, func() {
 		convey.Convey("Local tcp connection", func() {
@@ -85,6 +111,10 @@ func TestParseMycnf(t *testing.T) {
 		convey.Convey("Local tcp connection on non-default port", func() {
 			dsn, _ := parseMycnf([]byte(tcpConfig2))
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3308)/")
+		})
+		convey.Convey("Authentication with client certificate and no password", func() {
+			dsn, _ := parseMycnf([]byte(clientAuthConfig))
+			convey.So(dsn, convey.ShouldEqual, "root@tcp(localhost:3308)/")
 		})
 		convey.Convey("Socket connection", func() {
 			dsn, _ := parseMycnf([]byte(socketConfig))
@@ -98,21 +128,25 @@ func TestParseMycnf(t *testing.T) {
 			dsn, _ := parseMycnf([]byte(remoteConfig))
 			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@tcp(1.2.3.4:3307)/")
 		})
+		convey.Convey("Ignore boolean keys", func() {
+			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys))
+			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
+		})
 		convey.Convey("Missed user", func() {
 			_, err := parseMycnf([]byte(badConfig))
-			convey.So(err, convey.ShouldNotBeNil)
+			convey.So(err, convey.ShouldBeError, fmt.Errorf("password or ssl-key should be specified under [client] in %s", badConfig))
 		})
 		convey.Convey("Missed password", func() {
 			_, err := parseMycnf([]byte(badConfig2))
-			convey.So(err, convey.ShouldNotBeNil)
+			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig2))
 		})
 		convey.Convey("No [client] section", func() {
 			_, err := parseMycnf([]byte(badConfig3))
-			convey.So(err, convey.ShouldNotBeNil)
+			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig3))
 		})
 		convey.Convey("Invalid config", func() {
 			_, err := parseMycnf([]byte(badConfig4))
-			convey.So(err, convey.ShouldNotBeNil)
+			convey.So(err, convey.ShouldBeError, fmt.Errorf("failed reading ini file: unclosed section: %s", badConfig4))
 		})
 	})
 }

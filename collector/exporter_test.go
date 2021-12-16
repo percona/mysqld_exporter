@@ -3,8 +3,11 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/smartystreets/goconvey/convey"
@@ -26,11 +29,12 @@ func TestExporter(t *testing.T) {
 
 	exporter := New(
 		context.Background(),
-		db,
-		NewMetrics(""),
+		dsn,
+		NewMetrics(),
 		[]Scraper{
 			ScrapeGlobalStatus{},
 		},
+		log.NewNopLogger(),
 	)
 
 	convey.Convey("Metrics describing", t, func() {

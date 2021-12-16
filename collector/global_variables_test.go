@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
 func TestScrapeGlobalVariables(t *testing.T) {
@@ -38,7 +39,7 @@ func TestScrapeGlobalVariables(t *testing.T) {
 
 	ch := make(chan prometheus.Metric)
 	go func() {
-		if err = (ScrapeGlobalVariables{}).Scrape(context.Background(), db, ch); err != nil {
+		if err = (ScrapeGlobalVariables{}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)
@@ -65,7 +66,7 @@ func TestScrapeGlobalVariables(t *testing.T) {
 
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expections: %s", err)
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
 
@@ -77,7 +78,7 @@ func TestParseWsrepProviderOptions(t *testing.T) {
 	convey.Convey("Parse wsrep_provider_options", t, func() {
 		convey.So(parseWsrepProviderOptions(testE), convey.ShouldEqual, 0)
 		convey.So(parseWsrepProviderOptions(testM), convey.ShouldEqual, 128*1024*1024)
-		convey.So(parseWsrepProviderOptions(testG), convey.ShouldEqual, 2*1024*1024*1024)
+		convey.So(parseWsrepProviderOptions(testG), convey.ShouldEqual, int64(2*1024*1024*1024))
 		convey.So(parseWsrepProviderOptions(testB), convey.ShouldEqual, 131072)
 	})
 }

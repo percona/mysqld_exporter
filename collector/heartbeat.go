@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -19,7 +20,7 @@ const (
 	// timestamps. %s will be replaced by the database and table name.
 	// The second column allows gets the server timestamp at the exact same
 	// time the query is run.
-	heartbeatQuery = "SELECT UNIX_TIMESTAMP(ts), UNIX_TIMESTAMP(NOW(6)), server_id from `%s`.`%s`"
+	heartbeatQuery = "SELECT UNIX_TIMESTAMP(ts), UNIX_TIMESTAMP(%s), server_id from `%s`.`%s`"
 )
 
 var (
@@ -31,6 +32,10 @@ var (
 		"collect.heartbeat.table",
 		"Table from where to collect heartbeat data",
 	).Default("heartbeat").String()
+	collectHeartbeatUtc = kingpin.Flag(
+		"collect.heartbeat.utc",
+		"Use UTC for timestamps of the current server (`pt-heartbeat` is called with `--utc`)",
+	).Bool()
 )
 
 // Metric descriptors.
@@ -56,12 +61,12 @@ var (
 // );
 type ScrapeHeartbeat struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeHeartbeat) Name() string {
 	return "heartbeat"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeHeartbeat) Help() string {
 	return "Collect from heartbeat"
 }
@@ -71,9 +76,17 @@ func (ScrapeHeartbeat) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeHeartbeat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
-	query := fmt.Sprintf(heartbeatQuery, *collectHeartbeatDatabase, *collectHeartbeatTable)
+// nowExpr returns a current timestamp expression.
+func nowExpr() string {
+	if *collectHeartbeatUtc {
+		return "UTC_TIMESTAMP(6)"
+	}
+	return "NOW(6)"
+}
+
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeHeartbeat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+	query := fmt.Sprintf(heartbeatQuery, nowExpr(), *collectHeartbeatDatabase, *collectHeartbeatTable)
 	heartbeatRows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return err
@@ -118,3 +131,6 @@ func (ScrapeHeartbeat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometh
 
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeHeartbeat{}

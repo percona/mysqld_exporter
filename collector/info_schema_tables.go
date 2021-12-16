@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -37,11 +38,16 @@ const (
 		`
 )
 
+// Tunable flags.
 var (
 	tableSchemaDatabases = kingpin.Flag(
 		"collect.info_schema.tables.databases",
 		"The list of databases to collect table stats for, or '*' for all",
 	).Default("*").String()
+)
+
+// Metric descriptors.
+var (
 	infoSchemaTablesVersionDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, informationSchema, "table_version"),
 		"The version number of the table's .frm file",
@@ -62,12 +68,12 @@ var (
 // ScrapeTableSchema collects from `information_schema.tables`.
 type ScrapeTableSchema struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeTableSchema) Name() string {
 	return informationSchema + ".tables"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeTableSchema) Help() string {
 	return "Collect metrics from information_schema.tables"
 }
@@ -77,8 +83,8 @@ func (ScrapeTableSchema) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) (e error) { //nolint:funlen
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
@@ -98,7 +104,7 @@ func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 
 	var dbList []string
 	if *tableSchemaDatabases == "*" {
-		dbListRows, err := conn.QueryContext(ctx, dbListQuery)
+		dbListRows, err := db.QueryContext(ctx, dbListQuery)
 		if err != nil {
 			return err
 		}
@@ -119,7 +125,7 @@ func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 	}
 
 	for _, database := range dbList {
-		tableSchemaRows, err := conn.QueryContext(ctx, fmt.Sprintf(tableSchemaQuery, database))
+		tableSchemaRows, err := db.QueryContext(ctx, fmt.Sprintf(tableSchemaQuery, database))
 		if err != nil {
 			return err
 		}
@@ -181,3 +187,6 @@ func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeTableSchema{}

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -16,7 +17,7 @@ const (
 	// Math constant for picoseconds to seconds.
 	picoSeconds = 1e12
 	// Query to check whether user/table/client stats are enabled.
-	userstatCheckQuery = `SHOW VARIABLES WHERE Variable_Name='userstat'
+	userstatCheckQuery = `SHOW GLOBAL VARIABLES WHERE Variable_Name='userstat'
 		OR Variable_Name='userstat_running'`
 )
 
@@ -30,22 +31,26 @@ func newDesc(subsystem, name, help string) *prometheus.Desc {
 }
 
 func parseStatus(data sql.RawBytes) (float64, bool) {
-	if bytes.Compare(data, []byte("Yes")) == 0 || bytes.Compare(data, []byte("ON")) == 0 {
+	dataString := strings.ToLower(string(data))
+	switch dataString {
+	case "yes", "on":
 		return 1, true
-	}
-	if bytes.Compare(data, []byte("No")) == 0 || bytes.Compare(data, []byte("OFF")) == 0 {
+	case "no", "off", "disabled":
 		return 0, true
-	}
 	// SHOW SLAVE STATUS Slave_IO_Running can return "Connecting" which is a non-running state.
-	if bytes.Compare(data, []byte("Connecting")) == 0 {
+	case "connecting":
 		return 0, true
-	}
 	// SHOW GLOBAL STATUS like 'wsrep_cluster_status' can return "Primary" or "non-Primary"/"Disconnected"
-	if bytes.Compare(data, []byte("Primary")) == 0 {
+	case "primary":
 		return 1, true
-	}
-	if strings.EqualFold(string(data), "non-Primary") || bytes.Compare(data, []byte("Disconnected")) == 0 {
+	case "non-primary", "disconnected":
 		return 0, true
+	}
+	if ts, err := time.Parse("Jan 02 15:04:05 2006 MST", string(data)); err == nil {
+		return float64(ts.Unix()), true
+	}
+	if ts, err := time.Parse("2006-01-02 15:04:05", string(data)); err == nil {
+		return float64(ts.Unix()), true
 	}
 	if logNum := logRE.Find(data); logNum != nil {
 		value, err := strconv.ParseFloat(string(logNum), 64)
@@ -53,4 +58,14 @@ func parseStatus(data sql.RawBytes) (float64, bool) {
 	}
 	value, err := strconv.ParseFloat(string(data), 64)
 	return value, err == nil
+}
+
+func parsePrivilege(data sql.RawBytes) (float64, bool) {
+	if bytes.Equal(data, []byte("Y")) {
+		return 1, true
+	}
+	if bytes.Equal(data, []byte("N")) {
+		return 0, true
+	}
+	return -1, false
 }

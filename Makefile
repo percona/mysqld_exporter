@@ -87,4 +87,4 @@ help:             ## Display this help message.
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | \
         awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
-.PHONY: all style format build test vet tarball docker promu env-up env-down help default 
+.PHONY: all style format build test vet tarball docker promu env-up env-down help default

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -42,12 +43,12 @@ var (
 // ScrapeBinlogSize colects from `SHOW BINARY LOGS`.
 type ScrapeBinlogSize struct{}
 
-// Name of the Scraper.
+// Name of the Scraper. Should be unique.
 func (ScrapeBinlogSize) Name() string {
 	return "binlog_size"
 }
 
-// Help returns additional information about Scraper.
+// Help describes the role of the Scraper.
 func (ScrapeBinlogSize) Help() string {
 	return "Collect the current size of all registered binlog files"
 }
@@ -57,8 +58,8 @@ func (ScrapeBinlogSize) Version() float64 {
 	return 5.1
 }
 
-// Scrape collects data.
-func (ScrapeBinlogSize) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+// Scrape collects data from database connection and sends it over channel as prometheus metric.
+func (ScrapeBinlogSize) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	var logBin uint8
 	err := db.QueryRowContext(ctx, logbinQuery).Scan(&logBin)
 	if err != nil {
@@ -123,3 +124,6 @@ func (ScrapeBinlogSize) Scrape(ctx context.Context, db *sql.DB, ch chan<- promet
 
 	return nil
 }
+
+// check interface
+var _ Scraper = ScrapeBinlogSize{}
