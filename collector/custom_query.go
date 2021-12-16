@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/go-kit/log"
 	"io/ioutil"
 	"math"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
 )
@@ -107,7 +107,7 @@ func (scq ScrapeCustomQuery) Version() float64 {
 }
 
 // Scrape collects data.
-func (scq ScrapeCustomQuery) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+func (scq ScrapeCustomQuery) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	cq := CustomQuery{
 		customMetricMap: make(map[string]MetricMapNamespace),
 		customQueryMap:  make(map[string]string),

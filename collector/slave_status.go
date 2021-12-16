@@ -5,12 +5,11 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"regexp"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 const (

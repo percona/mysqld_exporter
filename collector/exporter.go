@@ -18,7 +18,6 @@ import (
 	"github.com/go-kit/log/level"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -197,8 +196,11 @@ type Metrics struct {
 }
 
 // NewMetrics creates new Metrics instance.
-func NewMetrics() Metrics {
+func NewMetrics(resolution string) Metrics {
 	subsystem := exporter
+	if resolution != "" {
+		subsystem = exporter + "_" + resolution
+	}
 	return Metrics{
 		TotalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
