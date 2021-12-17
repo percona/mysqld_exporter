@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-kit/log"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -90,49 +91,50 @@ func TestParseMycnf(t *testing.T) {
 		`
 		badConfig4 = `[hello`
 	)
+	logger := log.NewNopLogger()
 	convey.Convey("Various .my.cnf configurations", t, func() {
 		convey.Convey("Local tcp connection", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig), nil)
+			dsn, _ := parseMycnf([]byte(tcpConfig), logger)
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
 		})
 		convey.Convey("Local tcp connection on non-default port", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig2), nil)
+			dsn, _ := parseMycnf([]byte(tcpConfig2), logger)
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3308)/")
 		})
 		convey.Convey("Authentication with client certificate and no password", func() {
-			dsn, _ := parseMycnf([]byte(clientAuthConfig), nil)
+			dsn, _ := parseMycnf([]byte(clientAuthConfig), logger)
 			convey.So(dsn, convey.ShouldEqual, "root@tcp(localhost:3308)/")
 		})
 		convey.Convey("Socket connection", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig), nil)
+			dsn, _ := parseMycnf([]byte(socketConfig), logger)
 			convey.So(dsn, convey.ShouldEqual, "user:pass@unix(/var/lib/mysql/mysql.sock)/")
 		})
 		convey.Convey("Socket connection ignoring defined host", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig2), nil)
+			dsn, _ := parseMycnf([]byte(socketConfig2), logger)
 			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@unix(/var/lib/mysql/mysql.sock)/")
 		})
 		convey.Convey("Remote connection", func() {
-			dsn, _ := parseMycnf([]byte(remoteConfig), nil)
+			dsn, _ := parseMycnf([]byte(remoteConfig), logger)
 			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@tcp(1.2.3.4:3307)/")
 		})
 		convey.Convey("Ignore boolean keys", func() {
-			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys), nil)
+			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys), logger)
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
 		})
 		convey.Convey("Missed user", func() {
-			_, err := parseMycnf([]byte(badConfig), nil)
+			_, err := parseMycnf([]byte(badConfig), logger)
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("password or ssl-key should be specified under [client] in %s", badConfig))
 		})
 		convey.Convey("Missed password", func() {
-			_, err := parseMycnf([]byte(badConfig2), nil)
+			_, err := parseMycnf([]byte(badConfig2), logger)
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig2))
 		})
 		convey.Convey("No [client] section", func() {
-			_, err := parseMycnf([]byte(badConfig3), nil)
+			_, err := parseMycnf([]byte(badConfig3), logger)
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig3))
 		})
 		convey.Convey("Invalid config", func() {
-			_, err := parseMycnf([]byte(badConfig4), nil)
+			_, err := parseMycnf([]byte(badConfig4), logger)
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("failed reading ini file: unclosed section: %s", badConfig4))
 		})
 	})

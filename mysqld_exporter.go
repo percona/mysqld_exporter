@@ -258,7 +258,7 @@ func parseMycnf(config interface{}, logger log.Logger) (string, error) {
 		dsn = fmt.Sprintf("%s?tls=custom", dsn)
 	}
 
-	level.Debug(logger).Log(dsn)
+	level.Debug(logger).Log("dsn", dsn)
 	return dsn, nil
 }
 
