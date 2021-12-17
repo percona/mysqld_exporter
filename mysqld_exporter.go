@@ -537,12 +537,6 @@ func main() {
 	// Use default mux for /debug/vars and /debug/pprof
 	mux := http.DefaultServeMux
 
-	handlerFunc := newHandler(cfg, collector.NewMetrics(""), enabledScrapers, logger, true)
-	mux.Handle(*metricPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handlerFunc))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(landingPage)
-	})
-
 	// Defines what to scrape in each resolution.
 	all, hr, mr, lr := enabledScrapersByResolution(scraperFlags)
 
@@ -618,7 +612,7 @@ func setTLSConfig(dsn string) (string, error) {
 
 func newDB(dsn string) (*sql.DB, error) {
 	// Validate DSN, and open connection pool.
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", collector.FixDSN(dsn))
 	if err != nil {
 		return nil, err
 	}

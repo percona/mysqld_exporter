@@ -19,7 +19,7 @@ func TestExporter(t *testing.T) {
 		t.Skip("-short is passed, skipping test")
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", FixDSN(dsn))
 	if err != nil {
 		t.Fatal(err)
 	}

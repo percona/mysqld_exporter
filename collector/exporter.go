@@ -89,10 +89,18 @@ func New(ctx context.Context, dsn string, metrics Metrics, scrapers []Scraper, l
 	return &Exporter{
 		ctx:      ctx,
 		logger:   logger,
-		dsn:      dsn,
+		dsn:      FixDSN(dsn),
 		scrapers: scrapers,
 		metrics:  metrics,
 	}
+}
+
+func FixDSN(dsn string) string {
+	// MySQL 1.6 driver support
+	if !strings.Contains(dsn, "/") {
+		return "/" + dsn
+	}
+	return dsn
 }
 
 // Describe implements prometheus.Collector.
@@ -118,7 +126,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	var err error
 
 	scrapeTime := time.Now()
-	db, err := sql.Open("mysql", e.dsn)
+	db, err := sql.Open("mysql", FixDSN(e.dsn))
 	if err != nil {
 		level.Error(e.logger).Log("msg", "Error opening connection to database", "err", err)
 		e.metrics.Error.Set(1)
