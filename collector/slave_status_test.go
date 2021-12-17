@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	stdLog "log"
 )
 
 func TestScrapeSlaveStatus(t *testing.T) {
@@ -32,7 +33,7 @@ func TestScrapeSlaveStatus(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
-			t.Errorf("error calling function on test: %s", err)
+			stdLog.Fatalf("error calling function on test: %s", err)
 		}
 		close(ch)
 	}()
@@ -146,7 +147,7 @@ func TestScrapeSlaveStatusVersions(t *testing.T) {
 		ch := make(chan prometheus.Metric)
 		go func() {
 			if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), db, ch, logger); err != nil {
-				t.Errorf("error calling function on test: %s", err)
+				stdLog.Fatalf("error calling function on test: %s", err)
 			}
 			close(ch)
 		}()
