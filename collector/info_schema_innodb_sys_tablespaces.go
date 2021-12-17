@@ -20,20 +20,31 @@ const innodbTablespacesTablenameQuery = `
 	  WHERE table_name = 'INNODB_SYS_TABLESPACES'
 	    OR table_name = 'INNODB_TABLESPACES'
 	`
-const innodbTablespacesQuery = `
+
+const (
+	innodbTablespacesQueryv57 = `
 	SELECT
 	    SPACE,
 	    NAME,
-	    ifnull((SELECT column_name
-			FROM information_schema.COLUMNS
-			WHERE TABLE_SCHEMA = 'information_schema'
-			  AND TABLE_NAME = ` + "'%s'" + `
-			  AND COLUMN_NAME = 'FILE_FORMAT' LIMIT 1), 'NONE') as FILE_FORMAT,
+	    ifnull(FILE_FORMAT, 'NONE') as FILE_FORMAT,
 	    ifnull(ROW_FORMAT, 'NONE') as ROW_FORMAT,
 	    ifnull(SPACE_TYPE, 'NONE') as SPACE_TYPE,
 	    FILE_SIZE,
 	    ALLOCATED_SIZE
-	  FROM information_schema.` + "`%s`"
+	  FROM information_schema.innodb_sys_tablespaces
+	`
+	innodbTablespacesQueryv80 = `
+	SELECT
+	    SPACE,
+	    NAME,
+	    'NONE' as FILE_FORMAT,
+	    ifnull(ROW_FORMAT, 'NONE') as ROW_FORMAT,
+	    ifnull(SPACE_TYPE, 'NONE') as SPACE_TYPE,
+	    FILE_SIZE,
+	    ALLOCATED_SIZE
+	  FROM information_schema.innodb_tablespaces
+	`
+)
 
 // Metric descriptors.
 var (
@@ -54,7 +65,20 @@ var (
 	)
 
 	doOnce                 sync.Once
-	innodbTablespacesQuery string
+	innodbTablespacesQuery = `
+	SELECT
+	    SPACE,
+	    NAME,
+	    ifnull((SELECT column_name
+			FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA = 'information_schema'
+			  AND TABLE_NAME = ` + "'%s'" + `
+			  AND COLUMN_NAME = 'FILE_FORMAT' LIMIT 1), 'NONE') as FILE_FORMAT,
+	    ifnull(ROW_FORMAT, 'NONE') as ROW_FORMAT,
+	    ifnull(SPACE_TYPE, 'NONE') as SPACE_TYPE,
+	    FILE_SIZE,
+	    ALLOCATED_SIZE
+	  FROM information_schema.` + "`%s`"
 )
 
 // ScrapeInfoSchemaInnodbTablespaces collects from `information_schema.innodb_sys_tablespaces`.

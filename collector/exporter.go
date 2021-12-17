@@ -8,10 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"regexp"
-	"runtime/pprof"
-	"strconv"
-	"sync"
 	"time"
 
 	"github.com/go-kit/log"

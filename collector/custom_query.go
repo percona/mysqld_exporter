@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"io/ioutil"
 	"math"
 	"path/filepath"
@@ -137,7 +138,7 @@ func (scq ScrapeCustomQuery) Scrape(ctx context.Context, db *sql.DB, ch chan<- p
 			}
 
 			cq.mappingMtx.Lock()
-			err = addQueries(userQueriesData, cq.customMetricMap, cq.customQueryMap)
+			err = addQueries(userQueriesData, cq.customMetricMap, cq.customQueryMap, logger)
 			cq.mappingMtx.Unlock()
 			if err != nil {
 				return fmt.Errorf("failed to add custom queries:%s", err)
@@ -147,7 +148,7 @@ func (scq ScrapeCustomQuery) Scrape(ctx context.Context, db *sql.DB, ch chan<- p
 
 	cq.mappingMtx.RLock()
 	defer cq.mappingMtx.RUnlock()
-	errMap := queryNamespaceMappings(ctx, ch, db, cq.customMetricMap, cq.customQueryMap)
+	errMap := queryNamespaceMappings(ctx, ch, db, cq.customMetricMap, cq.customQueryMap, logger)
 	if len(errMap) > 0 {
 		errs := make([]string, 0, len(errMap))
 		for k, v := range errMap {
@@ -183,7 +184,7 @@ func (cm *ColumnMapping) UnmarshalYAML(unmarshal func(interface{}) error) error 
 // addQueries metricMap and customQueryMap to contain the new queries.
 // Added queries do not respect version requirements, because it is assumed that
 // the user knows what they are doing with their version of mysql.
-func addQueries(content []byte, exporterMap map[string]MetricMapNamespace, customQueryMap map[string]string) error {
+func addQueries(content []byte, exporterMap map[string]MetricMapNamespace, customQueryMap map[string]string, logger log.Logger) error {
 	var extra map[string]interface{}
 	err := yaml.Unmarshal(content, &extra)
 	if err != nil {
@@ -192,7 +193,7 @@ func addQueries(content []byte, exporterMap map[string]MetricMapNamespace, custo
 	// Stores the loaded map representation.
 	metricMaps := make(map[string]map[string]ColumnMapping)
 	for metric, specs := range extra {
-		log.Debugln("New user metric namespace from YAML:", metric)
+		level.Debug(logger).Log("msg", "New user metric namespace from YAML", "metric", metric)
 		specMap, ok := specs.(map[interface{}]interface{})
 		if !ok {
 			return fmt.Errorf("incorrect yaml format for %+v", specs)
@@ -241,12 +242,12 @@ func addQueries(content []byte, exporterMap map[string]MetricMapNamespace, custo
 
 	// Convert the loaded metric map into exporter representation.
 	// Merge the two maps (which are now quite flatteend).
-	makeDescMap(metricMaps, exporterMap)
+	makeDescMap(metricMaps, exporterMap, logger)
 	return nil
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
-func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map[string]MetricMapNamespace) {
+func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map[string]MetricMapNamespace, logger log.Logger) {
 	metricMap := make(map[string]MetricMapNamespace)
 	for namespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
@@ -274,7 +275,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map
 					desc: prometheus.NewDesc(fmt.Sprintf("%s_%s", namespace, columnName),
 						columnMapping.description, constLabels, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in)
+						return dbToFloat64(in, nil)
 					},
 				}
 			case gauge:
@@ -283,7 +284,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map
 					desc: prometheus.NewDesc(fmt.Sprintf("%s_%s", namespace, columnName),
 						columnMapping.description, constLabels, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in)
+						return dbToFloat64(in, logger)
 					},
 				}
 			case mappedMetric:
@@ -317,7 +318,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map
 						case string:
 							durationString = t
 						default:
-							log.Errorln("DURATION conversion metric was not a string")
+							level.Error(logger).Log("msg", "DURATION conversion metric was not a string")
 							return math.NaN(), false
 						}
 
@@ -327,7 +328,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, exporterMap map
 
 						d, err := time.ParseDuration(durationString)
 						if err != nil {
-							log.Errorln("Failed converting result to metric:", columnName, in, err)
+							level.Error(logger).Log("msg", "Failed converting result to metric", "column", columnName, "in", in, "err", err)
 							return math.NaN(), false
 						}
 						return float64(d / time.Millisecond), true
@@ -363,7 +364,7 @@ func stringToColumnUsage(s string) (ColumnUsage, error) {
 
 // Convert "database/sql value" types to float64s for Prometheus consumption.
 // Null types are mapped to NaN. string and []byte types are mapped as NaN and !ok.
-func dbToFloat64(t interface{}) (float64, bool) {
+func dbToFloat64(t interface{}, logger log.Logger) (float64, bool) {
 	switch v := t.(type) {
 	case int64:
 		return float64(v), true
@@ -376,14 +377,14 @@ func dbToFloat64(t interface{}) (float64, bool) {
 		strV := string(v)
 		result, err := strconv.ParseFloat(strV, 64)
 		if err != nil {
-			log.Warnln("Could not parse []byte:", err)
+			level.Warn(logger).Log("msg", "Could not parse []byte", "err", err)
 			return math.NaN(), false
 		}
 		return result, true
 	case string:
 		result, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			log.Warnln("Could not parse string:", err)
+			level.Warn(logger).Log("msg", "Could not parse string", "err", err)
 			return math.NaN(), false
 		}
 		return result, true
@@ -416,9 +417,14 @@ func dbToString(t interface{}) (string, bool) {
 
 // Query within a namespace mapping and emit metrics. Returns fatal error if
 // the scrape fails, and a slice of errors if they were non-fatal.
-func queryNamespaceMapping(ctx context.Context, ch chan<- prometheus.Metric,
-	db *sql.DB, namespace string, mapping MetricMapNamespace,
-	customQueries map[string]string) ([]error, error) {
+func queryNamespaceMapping(
+	ctx context.Context,
+	ch chan<- prometheus.Metric,
+	db *sql.DB,
+	namespace string,
+	mapping MetricMapNamespace,
+	customQueries map[string]string,
+	logger log.Logger) ([]error, error) {
 	// Check for a query override for this namespace.
 	query, found := customQueries[namespace]
 
@@ -467,7 +473,7 @@ func queryNamespaceMapping(ctx context.Context, ch chan<- prometheus.Metric,
 		for idx, columnName := range mapping.labels {
 			labels[idx], ok = dbToString(columnData[columnIdx[columnName]])
 			if !ok {
-				log.Infoln("converted NULL to an empty string")
+				level.Info(logger).Log("converted NULL to an empty string")
 			}
 		}
 
@@ -481,7 +487,7 @@ func queryNamespaceMapping(ctx context.Context, ch chan<- prometheus.Metric,
 					continue
 				}
 
-				value, ok := dbToFloat64(columnData[idx])
+				value, ok := dbToFloat64(columnData[idx], nil)
 				if !ok {
 					e := fmt.Errorf("unexpected error parsing column: %s, %s, %s",
 						namespace, columnName, columnData[idx])
@@ -496,7 +502,7 @@ func queryNamespaceMapping(ctx context.Context, ch chan<- prometheus.Metric,
 				metricLabel := fmt.Sprintf("%s_%s", namespace, columnName)
 				desc := prometheus.NewDesc(metricLabel, fmt.Sprintf("Unknown metric from %s", namespace), mapping.labels, nil)
 				// Its not an error to fail here, since the values are unexpected anyway.
-				value, ok := dbToFloat64(columnData[idx])
+				value, ok := dbToFloat64(columnData[idx], nil)
 				if !ok {
 					nonfatalErrors = append(nonfatalErrors,
 						fmt.Errorf("unparseable column type - discarding: %s, %s, %s", namespace, columnName, err))
@@ -511,12 +517,17 @@ func queryNamespaceMapping(ctx context.Context, ch chan<- prometheus.Metric,
 }
 
 // Iterate through all the namespace mappings in the exporter and run their queries.
-func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric,
-	db *sql.DB, metricMap map[string]MetricMapNamespace, customQueries map[string]string) map[string]error {
+func queryNamespaceMappings(
+	ctx context.Context,
+	ch chan<- prometheus.Metric,
+	db *sql.DB,
+	metricMap map[string]MetricMapNamespace,
+	customQueries map[string]string,
+	logger log.Logger) map[string]error {
 	// Return a map of namespace -> errors.
 	namespaceErrors := make(map[string]error)
 	for namespace, mapping := range metricMap {
-		nonFatalErrors, err := queryNamespaceMapping(ctx, ch, db, namespace, mapping, customQueries)
+		nonFatalErrors, err := queryNamespaceMapping(ctx, ch, db, namespace, mapping, customQueries, logger)
 		// Serious error - a namespace disappeared.
 		if err != nil {
 			namespaceErrors[namespace] = err
@@ -524,7 +535,7 @@ func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric,
 		// Non-serious errors - likely version or parsing problems.
 		if len(nonFatalErrors) > 0 {
 			for _, err := range nonFatalErrors {
-				log.Infoln(err.Error())
+				level.Info(logger).Log(err.Error())
 			}
 		}
 	}

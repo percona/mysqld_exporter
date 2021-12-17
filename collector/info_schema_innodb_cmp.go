@@ -5,9 +5,8 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
-
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -69,7 +68,7 @@ func (ScrapeInnodbCmp) Version() float64 {
 func (ScrapeInnodbCmp) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	informationSchemaInnodbCmpRows, err := db.QueryContext(ctx, innodbCmpQuery)
 	if err != nil {
-		log.Debugln("INNODB_CMP stats are not available.")
+		level.Debug(logger).Log("msg", "INNODB_CMP stats are not available.")
 		return err
 	}
 	defer informationSchemaInnodbCmpRows.Close()

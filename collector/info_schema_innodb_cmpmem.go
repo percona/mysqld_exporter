@@ -5,8 +5,7 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
+	"github.com/go-kit/log"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
