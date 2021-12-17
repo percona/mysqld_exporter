@@ -414,8 +414,6 @@ func main() {
 	kingpin.Parse()
 	logger := promlog.New(promlogConfig)
 
-	log
-
 	if *showVersion {
 		fmt.Fprintln(os.Stdout, version.Print("mysqld_exporter"))
 		os.Exit(0)

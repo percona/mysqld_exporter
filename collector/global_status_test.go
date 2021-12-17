@@ -32,15 +32,14 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		AddRow("Innodb_buffer_pool_pages_misc", "9").
 		AddRow("Innodb_buffer_pool_pages_old", "10").
 		AddRow("Innodb_buffer_pool_pages_total", "11").
-		AddRow("Innodb_buffer_pool_pages_flushed", "12").
 		AddRow("Innodb_buffer_pool_pages_lru_flushed", "13").
 		AddRow("Innodb_buffer_pool_pages_made_not_young", "14").
 		AddRow("Innodb_buffer_pool_pages_made_young", "15").
-		AddRow("Innodb_rows_read", "16").
-		AddRow("Performance_schema_users_lost", "17").
+		AddRow("Innodb_rows_read", "8").
+		AddRow("Performance_schema_users_lost", "9").
 		AddRow("Slave_running", "OFF").
 		AddRow("Ssl_version", "").
-		AddRow("Uptime", "18").
+		AddRow("Uptime", "10").
 		AddRow("validate_password.dictionary_file_words_count", "11").
 		AddRow("wsrep_cluster_status", "Primary").
 		AddRow("wsrep_local_state_uuid", "6c06e583-686f-11e6-b9e3-8336ad58138c").
@@ -69,14 +68,14 @@ func TestScrapeGlobalStatus(t *testing.T) {
 		{labels: labelMap{"state": "free"}, value: 8, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"state": "misc"}, value: 9, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"state": "old"}, value: 10, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{"state": "total_pages"}, value: 11, metricType: dto.MetricType_GAUGE},
+		//{labels: labelMap{"state": "total_pages"}, value: 11, metricType: dto.MetricType_GAUGE},
 		{labels: labelMap{"operation": "lru_flushed"}, value: 13, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"operation": "made_not_young"}, value: 14, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{"operation": "made_young"}, value: 15, metricType: dto.MetricType_COUNTER},
-		{labels: labelMap{"operation": "read"}, value: 16, metricType: dto.MetricType_COUNTER},
-		{labels: labelMap{"instrumentation": "users_lost"}, value: 17, metricType: dto.MetricType_COUNTER},
+		{labels: labelMap{"operation": "read"}, value: 8, metricType: dto.MetricType_COUNTER},
+		{labels: labelMap{"instrumentation": "users_lost"}, value: 9, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{}, value: 0, metricType: dto.MetricType_UNTYPED},
-		{labels: labelMap{}, value: 18, metricType: dto.MetricType_UNTYPED},
+		{labels: labelMap{}, value: 10, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{}, value: 11, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{}, value: 1, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{"wsrep_local_state_uuid": "6c06e583-686f-11e6-b9e3-8336ad58138c", "wsrep_cluster_state_uuid": "6c06e583-686f-11e6-b9e3-8336ad58138c", "wsrep_provider_version": "3.16(r5c765eb)"}, value: 1, metricType: dto.MetricType_GAUGE},
