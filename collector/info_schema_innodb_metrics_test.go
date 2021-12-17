@@ -10,13 +10,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"github.com/DATA-DOG/go-sqlmock"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 func TestScrapeInnodbMetrics(t *testing.T) {
 	// Suppress a log messages
-	log.AddFlags(kingpin.CommandLine)
 	_, err := kingpin.CommandLine.Parse([]string{"--log.level", "fatal"})
 	if err != nil {
 		t.Fatal(err)

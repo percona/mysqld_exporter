@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestScrapeInfoSchemaInnodbTablespaces(t *testing.T) {

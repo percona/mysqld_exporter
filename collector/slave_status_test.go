@@ -142,9 +142,10 @@ func TestScrapeSlaveStatusVersions(t *testing.T) {
 			AddRow("127.0.0.1", "1", "Connecting", "Yes", "2")
 		mock.ExpectQuery(sanitizeQuery(qt.query)).WillReturnRows(rows)
 
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
 		go func() {
-			if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), db, ch); err != nil {
+			if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), db, ch, logger); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
 			close(ch)

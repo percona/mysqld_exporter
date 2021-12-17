@@ -3,15 +3,16 @@ package collector
 import (
 	"context"
 	"fmt"
+	"github.com/go-kit/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"github.com/DATA-DOG/go-sqlmock"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -56,9 +57,10 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 			AddRow("plumb", "80")
 		mock.ExpectQuery(sanitizeQuery("SELECT fruit, amount FROM experiment.garden;")).WillReturnRows(rows)
 
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
 		go func() {
-			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch); err != nil {
+			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, logger); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
 			close(ch)
@@ -119,9 +121,10 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 			AddRow("plumb", "2892000000")
 		mock.ExpectQuery(sanitizeQuery("SELECT fruit, ripen FROM experiment.garden;")).WillReturnRows(rows)
 
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
 		go func() {
-			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch); err != nil {
+			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, logger); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
 			close(ch)
@@ -177,11 +180,11 @@ func TestScrapeCustomQueriesDbError(t *testing.T) {
 		expectedError := fmt.Errorf("ERROR 1049 (42000): Unknown database 'non_existed_experiment'")
 		mock.ExpectQuery(sanitizeQuery("SELECT fruit, ripen FROM non_existed_experiment.garden;")).WillReturnError(expectedError)
 
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
-
 		expectedErr := "experiment_garden:error running query on database: experiment_garden, ERROR 1049 (42000): Unknown database 'non_existed_experiment'"
 		convey.Convey("Should raise error ", func() {
-			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch)
+			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, logger)
 			convey.So(err, convey.ShouldBeError, expectedErr)
 		})
 		close(ch)
@@ -206,10 +209,11 @@ func TestScrapeCustomQueriesIncorrectYaml(t *testing.T) {
 		}
 		defer db.Close()
 
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
 
 		convey.Convey("Should raise error ", func() {
-			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch)
+			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, logger)
 			convey.So(err, convey.ShouldBeError, "failed to add custom queries:incorrect yaml format for bar")
 		})
 		close(ch)
@@ -224,8 +228,9 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)
 		}
+		logger := log.NewNopLogger()
 		ch := make(chan prometheus.Metric)
-		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch)
+		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, logger)
 		close(ch)
 		convey.So(err, convey.ShouldBeError, "failed read dir \"/wrong/path\" for custom query. reason: open /wrong/path: no such file or directory")
 	})

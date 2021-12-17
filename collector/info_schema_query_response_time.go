@@ -116,12 +116,12 @@ func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<-
 	// https://www.percona.com/doc/percona-server/5.7/diagnostics/response_time_distribution.html
 	err := db.QueryRowContext(ctx, checkQueryResponseTimePlugins).Scan(&activeQueryResponseTimePlugins)
 	if err != nil {
-		log.Debugf("Cannot check if QUERY_RESPONSE_TIME plugin is present: %v", err)
+		level.Debug(logger).Log("msg", "Cannot check if QUERY_RESPONSE_TIME plugin is present", "err", err)
 		return nil
 	}
 
 	if activeQueryResponseTimePlugins == 0 {
-		log.Debugln("None or inactive QUERY_RESPONSE_TIME plugin")
+		level.Debug(logger).Log("msg", "None or inactive QUERY_RESPONSE_TIME plugin")
 		return nil
 	}
 

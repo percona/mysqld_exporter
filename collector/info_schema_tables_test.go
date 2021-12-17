@@ -5,6 +5,7 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"github.com/go-kit/log"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,9 +59,10 @@ func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbNa
 	if err != nil {
 		t.Fatal(err)
 	}
+	logger := log.NewNopLogger()
 	ch := make(chan prometheus.Metric)
 	go func() { //nolint:wsl
-		if err = (ScrapeTableSchema{}).Scrape(ctx, db, ch); err != nil {
+		if err = (ScrapeTableSchema{}).Scrape(ctx, db, ch, logger); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)

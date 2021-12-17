@@ -11,8 +11,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"github.com/DATA-DOG/go-sqlmock"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 type ScrapeHeartbeatTestCase struct {

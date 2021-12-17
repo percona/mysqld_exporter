@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"github.com/go-kit/log"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -33,7 +34,7 @@ func (standardGo) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardGo) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+func (s standardGo) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }
@@ -64,7 +65,7 @@ func (standardProcess) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardProcess) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric) error {
+func (s standardProcess) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }

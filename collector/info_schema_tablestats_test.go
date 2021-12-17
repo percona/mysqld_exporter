@@ -8,7 +8,6 @@ import (
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/smartystreets/goconvey/convey"
-	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestScrapeTableStat(t *testing.T) {
