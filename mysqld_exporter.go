@@ -40,10 +40,6 @@ const (
 
 var (
 	webConfig   = webflag.AddFlags(kingpin.CommandLine)
-	showVersion = kingpin.Flag(
-		"version",
-		"Print version information.",
-	).Default("false").Bool()
 	listenAddress = kingpin.Flag(
 		"web.listen-address",
 		"Address to listen on for web interface and telemetry.",
@@ -65,14 +61,6 @@ var (
 		"Ignore certificate and server verification when using a tls connection.",
 	).Bool()
 
-	exporterLockTimeout = kingpin.Flag(
-		"exporter.lock_wait_timeout",
-		"Set a lock_wait_timeout on the connection to avoid long metadata locking.",
-	).Default("2").Int()
-	exporterLogSlowFilter = kingpin.Flag(
-		"exporter.log_slow_filter",
-		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
-	).Default("false").Bool()
 	exporterGlobalConnPool = kingpin.Flag(
 		"exporter.global-conn-pool",
 		"Use global connection pool instead of creating new pool for each http request.",
@@ -414,11 +402,6 @@ func main() {
 	kingpin.Parse()
 	logger := promlog.New(promlogConfig)
 
-	if *showVersion {
-		fmt.Fprintln(os.Stdout, version.Print("mysqld_exporter"))
-		os.Exit(0)
-	}
-
 	// landingPage contains the HTML served at '/'.
 	// TODO: Make this nicer and more informative.
 	landingPage := []byte(`<html>
@@ -452,8 +435,8 @@ func main() {
 	}
 
 	// Setup extra params for the DSN, default to having a lock timeout.
-	dsnParams := []string{fmt.Sprintf(timeoutParam, *exporterLockTimeout)}
-	if *exporterLogSlowFilter {
+	dsnParams := []string{fmt.Sprintf(timeoutParam, *collector.ExporterLockTimeout)}
+	if *collector.SlowLogFilter {
 		dsnParams = append(dsnParams, sessionSettingsParam)
 	}
 

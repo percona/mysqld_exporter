@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/go-kit/log/level"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 // Metric name parts.
@@ -39,11 +39,11 @@ var (
 
 // Tunable flags.
 var (
-	exporterLockTimeout = kingpin.Flag(
+	ExporterLockTimeout = kingpin.Flag(
 		"exporter.lock_wait_timeout",
 		"Set a lock_wait_timeout (in seconds) on the connection to avoid long metadata locking.",
 	).Default("2").Int()
-	slowLogFilter = kingpin.Flag(
+	SlowLogFilter = kingpin.Flag(
 		"exporter.log_slow_filter",
 		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
 	).Default("false").Bool()
@@ -73,9 +73,9 @@ type Exporter struct {
 // New returns a new MySQL exporter for the provided DSN.
 func New(ctx context.Context, dsn string, metrics Metrics, scrapers []Scraper, logger log.Logger) *Exporter {
 	// Setup extra params for the DSN, default to having a lock timeout.
-	dsnParams := []string{fmt.Sprintf(timeoutParam, *exporterLockTimeout)}
+	dsnParams := []string{fmt.Sprintf(timeoutParam, *ExporterLockTimeout)}
 
-	if *slowLogFilter {
+	if *SlowLogFilter {
 		dsnParams = append(dsnParams, sessionSettingsParam)
 	}
 
