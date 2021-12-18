@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-kit/log"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -21,6 +20,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/go-kit/log"
 
 	"github.com/smartystreets/goconvey/convey"
 )

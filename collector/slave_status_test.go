@@ -5,12 +5,13 @@ import (
 	"database/sql/driver"
 	"testing"
 
+	stdLog "log"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	stdLog "log"
 )
 
 func TestScrapeSlaveStatus(t *testing.T) {
@@ -126,7 +127,6 @@ func TestScrapeSlaveStatusVersions(t *testing.T) {
 	}
 
 	for _, qt := range queryTable {
-
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("error opening a stub database connection: %s", err)

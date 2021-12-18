@@ -3,11 +3,12 @@ package collector
 import (
 	"context"
 	"fmt"
-	"github.com/go-kit/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-kit/log"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/prometheus/client_golang/prometheus"
@@ -81,7 +82,7 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 
 		// Ensure all SQL queries were executed
 		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expections: %s", err)
+			t.Errorf("there were unfulfilled exceptions: %s", err)
 		}
 	})
 }
@@ -145,7 +146,7 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 
 		// Ensure all SQL queries were executed
 		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expections: %s", err)
+			t.Errorf("there were unfulfilled exceptions: %s", err)
 		}
 	})
 }

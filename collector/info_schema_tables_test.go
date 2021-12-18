@@ -5,14 +5,15 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"github.com/go-kit/log"
 	"testing"
+
+	"github.com/go-kit/log"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/smartystreets/goconvey/convey"
 )
 
-func TestScrapeTableSchema(t *testing.T) { //nolint:unused
+func TestScrapeTableSchema(t *testing.T) {
 	db, err := sql.Open("mysql", "root@tcp(127.0.0.1:3306)/")
 	if err != nil {
 		t.Fatal(err)

@@ -5,9 +5,10 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"github.com/go-kit/log/level"
 	"regexp"
 	"strings"
+
+	"github.com/go-kit/log/level"
 
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"

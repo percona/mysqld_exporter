@@ -2,12 +2,13 @@ package collector
 
 import (
 	"context"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
-	"testing"
 )
 
 func TestScrapePerfReplicationGroupMembers(t *testing.T) {

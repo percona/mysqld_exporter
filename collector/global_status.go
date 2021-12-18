@@ -180,7 +180,6 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 
 	// mysql_galera_evs_repl_latency
 	if textItems["wsrep_evs_repl_latency"] != "" {
-
 		type evsValue struct {
 			name  string
 			value float64
@@ -189,11 +188,11 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 		}
 
 		evsMap := []evsValue{
-			evsValue{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
-			evsValue{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
-			evsValue{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
-			evsValue{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
-			evsValue{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
+			{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
+			{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
+			{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
+			{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
+			{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
 		}
 
 		evsParsingSuccess := true

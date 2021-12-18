@@ -1,4 +1,4 @@
-#Percona MySQL Server Exporter [![Build Status](https://travis-ci.org/prometheus/mysqld_exporter.svg)][travis]
+#Percona MySQL Server Exporter
 
 Prometheus exporter for MySQL server metrics.
 

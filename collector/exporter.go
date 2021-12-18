@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"

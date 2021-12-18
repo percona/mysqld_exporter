@@ -3,9 +3,10 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"strings"
+
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"strings"
 )
 
 const perfReplicationGroupMembersQuery = `
@@ -72,7 +73,6 @@ func (ScrapePerfReplicationGroupMembers) Scrape(ctx context.Context, db *sql.DB,
 			prometheus.GaugeValue, 1, values...)
 	}
 	return nil
-
 }
 
 // check interface

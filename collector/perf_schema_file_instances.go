@@ -107,7 +107,6 @@ func (ScrapePerfFileInstances) Scrape(ctx context.Context, db *sql.DB, ch chan<-
 			performanceSchemaFileInstancesBytesDesc, prometheus.CounterValue, float64(sumBytesWritten),
 			fileName, eventName, "write",
 		)
-
 	}
 	return nil
 }
