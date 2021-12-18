@@ -20,14 +20,6 @@ const (
 	globalStatus = "global_status"
 )
 
-var replLatencyMap = []string{
-	"Minimum",
-	"Average",
-	"Maximum",
-	"Standard Deviation",
-	"Sample Size",
-}
-
 // Regexp to match various groups of status vars.
 var globalStatusRE = regexp.MustCompile(`^(com|handler|connection_errors|innodb_buffer_pool_pages|innodb_rows|performance_schema)_(.*)$`)
 

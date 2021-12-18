@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/prometheus/client_golang/prometheus/collectors"
+
 	"github.com/go-kit/log"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +17,7 @@ type standardGo struct {
 
 func NewStandardGo() Scraper {
 	return standardGo{
-		c: prometheus.NewGoCollector(),
+		c: collectors.NewGoCollector(),
 	}
 }
 
@@ -46,7 +48,7 @@ type standardProcess struct {
 
 func NewStandardProcess() Scraper {
 	return standardProcess{
-		c: prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+		c: collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	}
 }
 

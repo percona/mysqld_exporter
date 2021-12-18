@@ -19,9 +19,6 @@ const (
 	slaveStatus = "slave_status"
 )
 
-var slaveStatusQueries = [2]string{"SHOW ALL SLAVES STATUS", "SHOW SLAVE STATUS"}
-var slaveStatusQuerySuffixes = [3]string{" NONBLOCKING", " NOLOCK", ""}
-
 func columnIndex(slaveCols []string, colName string) int {
 	for idx := range slaveCols {
 		if slaveCols[idx] == colName {

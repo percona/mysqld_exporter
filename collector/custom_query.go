@@ -133,7 +133,7 @@ func (scq ScrapeCustomQuery) Scrape(ctx context.Context, db *sql.DB, ch chan<- p
 
 		if filepath.Ext(v.Name()) == ".yml" || filepath.Ext(v.Name()) == ".yaml" {
 			path := filepath.Join(*dirs[scq.Resolution], v.Name())
-			userQueriesData, err := ioutil.ReadFile(path)
+			userQueriesData, err := ioutil.ReadFile(path) // nolint
 			if err != nil {
 				return fmt.Errorf("failed to open custom queries:%s", err.Error())
 			}

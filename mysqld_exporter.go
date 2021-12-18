@@ -25,7 +25,6 @@ import (
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
-	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
@@ -39,7 +38,6 @@ const (
 )
 
 var (
-	webConfig     = webflag.AddFlags(kingpin.CommandLine)
 	listenAddress = kingpin.Flag(
 		"web.listen-address",
 		"Address to listen on for web interface and telemetry.",
@@ -56,10 +54,6 @@ var (
 		"config.my-cnf",
 		"Path to .my.cnf file to read MySQL credentials from.",
 	).Default(path.Join(os.Getenv("HOME"), ".my.cnf")).String()
-	tlsInsecureSkipVerify = kingpin.Flag(
-		"tls.insecure-skip-verify",
-		"Ignore certificate and server verification when using a tls connection.",
-	).Bool()
 
 	exporterGlobalConnPool = kingpin.Flag(
 		"exporter.global-conn-pool",
@@ -162,6 +156,11 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeHeartbeat{}:                           false,
 	collector.ScrapeSlaveHosts{}:                          false,
 	collector.ScrapeReplicaHost{}:                         false,
+	collector.ScrapeCustomQuery{Resolution: collector.HR}: false,
+	collector.ScrapeCustomQuery{Resolution: collector.MR}: false,
+	collector.ScrapeCustomQuery{Resolution: collector.LR}: false,
+	collector.NewStandardGo():                             false,
+	collector.NewStandardProcess():                        false,
 }
 
 // TODO Remove
@@ -253,7 +252,7 @@ func parseMycnf(config interface{}, logger log.Logger) (string, error) {
 func customizeTLS(sslCA string, sslCert string, sslKey string) error {
 	var tlsCfg tls.Config
 	caBundle := x509.NewCertPool()
-	pemCA, err := ioutil.ReadFile(sslCA)
+	pemCA, err := ioutil.ReadFile(sslCA) // nolint
 	if err != nil {
 		return err
 	}
@@ -271,7 +270,7 @@ func customizeTLS(sslCA string, sslCert string, sslKey string) error {
 		}
 		certPairs = append(certPairs, keypair)
 		tlsCfg.Certificates = certPairs
-		tlsCfg.InsecureSkipVerify = *tlsInsecureSkipVerify
+		tlsCfg.InsecureSkipVerify = *mysqlSSLSkipVerify
 	}
 	_ = mysql.RegisterTLSConfig("custom", &tlsCfg)
 	return nil
@@ -526,14 +525,6 @@ func main() {
 		level.Info(logger).Log("msg", "HTTPS/TLS is enabled")
 	}
 
-	// Register only scrapers enabled by flag.
-	enabledScrapers := []collector.Scraper{}
-	for scraper, enabled := range scraperFlags {
-		if *enabled {
-			level.Info(logger).Log("msg", "Scraper enabled", "scraper", scraper.Name())
-			enabledScrapers = append(enabledScrapers, scraper)
-		}
-	}
 	// Use default mux for /debug/vars and /debug/pprof
 	mux := http.DefaultServeMux
 
@@ -587,7 +578,7 @@ func main() {
 			w.Write(landingPage)
 		})
 		srv.TLSConfig = exporter_shared.TLSConfig()
-		srv.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0)
+		srv.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0) // nolint
 
 		level.Error(logger).Log("msg", srv.ListenAndServeTLS(*sslCertFile, *sslKeyFile))
 	} else {

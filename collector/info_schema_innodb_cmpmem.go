@@ -41,7 +41,7 @@ var (
 	)
 )
 
-// ScrapeInnodbCmp collects from `information_schema.innodb_cmp`.
+// ScrapeInnodbCmpMem collects from `information_schema.innodb_cmp`.
 type ScrapeInnodbCmpMem struct{}
 
 // Name of the Scraper. Should be unique.

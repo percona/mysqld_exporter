@@ -51,11 +51,11 @@ func TestScrapeTableSchema(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	addRowAndCheckRowsCount(t, ctx, db, dbName, tableName, 1)
-	addRowAndCheckRowsCount(t, ctx, db, dbName, tableName, 2)
+	addRowAndCheckRowsCount(ctx, t, db, dbName, tableName, 1)
+	addRowAndCheckRowsCount(ctx, t, db, dbName, tableName, 2)
 }
 
-func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbName, tableName string, expectedRowsCount float64) { //nolint:go-lint
+func addRowAndCheckRowsCount(ctx context.Context, t *testing.T, db *sql.DB, dbName, tableName string, expectedRowsCount float64) { //nolint:go-lint
 	_, err := db.Exec("INSERT INTO " + dbName + "." + tableName + " VALUES(50)")
 	if err != nil {
 		t.Fatal(err)

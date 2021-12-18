@@ -151,7 +151,7 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 	})
 }
 
-const customQueryNoDb = `
+const customQueryNoDB = `
 experiment_garden:
   query: "SELECT fruit, ripen FROM non_existed_experiment.garden;"
   metrics:
@@ -166,7 +166,7 @@ experiment_garden:
 
 func TestScrapeCustomQueriesDbError(t *testing.T) {
 	convey.Convey("Custom queries db error", t, func() {
-		tmpFileName := createTmpFile(t, string(HR), customQueryNoDb)
+		tmpFileName := createTmpFile(t, string(HR), customQueryNoDB)
 		defer os.Remove(tmpFileName)
 
 		*collectCustomQueryHrDirectory = filepath.Dir(tmpFileName)
@@ -237,7 +237,7 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 	})
 }
 
-func createTmpFile(t *testing.T, resolution, content string) string {
+func createTmpFile(t *testing.T, resolution, content string) string { // nolint
 	// Create our Temp File
 	tempDir := os.TempDir() + "/" + resolution
 	err := os.MkdirAll(tempDir, os.ModePerm)

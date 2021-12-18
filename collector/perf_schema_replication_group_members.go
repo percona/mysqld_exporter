@@ -13,7 +13,7 @@ const perfReplicationGroupMembersQuery = `
   SELECT * FROM performance_schema.replication_group_members
 	`
 
-// ScrapeReplicationGroupMembers collects from `performance_schema.replication_group_members`.
+// ScrapePerfReplicationGroupMembers collects from `performance_schema.replication_group_members`.
 type ScrapePerfReplicationGroupMembers struct{}
 
 // Name of the Scraper. Should be unique.

@@ -246,11 +246,11 @@ func (ScrapeClientStat) Scrape(ctx context.Context, db *sql.DB, ch chan<- promet
 		// cient, that we'll only get numbers.
 		for idx, columnName := range columnNames[1:] {
 			if metricType, ok := informationSchemaClientStatisticsTypes[columnName]; ok {
-				ch <- prometheus.MustNewConstMetric(metricType.desc, metricType.vtype, float64(clientStatData[idx]), client)
+				ch <- prometheus.MustNewConstMetric(metricType.desc, metricType.vtype, clientStatData[idx], client)
 			} else {
 				// Unknown metric. Report as untyped.
 				desc := prometheus.NewDesc(prometheus.BuildFQName(namespace, informationSchema, fmt.Sprintf("client_statistics_%s", strings.ToLower(columnName))), fmt.Sprintf("Unsupported metric from column %s", columnName), []string{"client"}, nil)
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.UntypedValue, float64(clientStatData[idx]), client)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.UntypedValue, clientStatData[idx], client)
 			}
 		}
 	}

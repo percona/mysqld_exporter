@@ -113,19 +113,19 @@ func (ScrapeHeartbeat) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometh
 			return err
 		}
 
-		serverId := strconv.Itoa(serverId)
+		serverID := strconv.Itoa(serverId)
 
 		ch <- prometheus.MustNewConstMetric(
 			HeartbeatNowDesc,
 			prometheus.GaugeValue,
 			nowFloatVal,
-			serverId,
+			serverID,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			HeartbeatStoredDesc,
 			prometheus.GaugeValue,
 			tsFloatVal,
-			serverId,
+			serverID,
 		)
 	}
 

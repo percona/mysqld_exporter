@@ -218,7 +218,7 @@ func TestBin(t *testing.T) {
 	for x, value := range xVariables {
 		ldflags = append(ldflags, fmt.Sprintf("-X %s=%s", x, value))
 	}
-	cmd := exec.Command(
+	cmd := exec.Command( // nolint
 		"go",
 		"build",
 		"-o",
@@ -294,7 +294,7 @@ func testVersion(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(
+	cmd := exec.CommandContext( // nolint
 		ctx,
 		data.path,
 		"--version",
@@ -353,7 +353,7 @@ func testLandingPage(t *testing.T, data bin) {
 	defer cancel()
 
 	// Run exporter.
-	cmd := exec.CommandContext(
+	cmd := exec.CommandContext( // nolint
 		ctx,
 		data.path,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
@@ -399,7 +399,7 @@ func testDefaultGatherer(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(
+	cmd := exec.CommandContext( // nolint
 		ctx,
 		data.path,
 		"--web.telemetry-path", metricPath,
@@ -437,7 +437,7 @@ func testDebugEndpoints(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(
+	cmd := exec.CommandContext( // nolint
 		ctx,
 		data.path,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
@@ -505,7 +505,7 @@ func waitForBody(urlToGet string) (body []byte, err error) {
 
 // getBody is a helper function which retrieves http body from given address.
 func getBody(urlToGet string) ([]byte, error) {
-	resp, err := http.Get(urlToGet)
+	resp, err := http.Get(urlToGet) // nolint
 	if err != nil {
 		return nil, err
 	}
