@@ -27,6 +27,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: percona-platform/checkout@v2
+    - name: Set up Go release
+      if: matrix.go-version != 'tip'
+      uses: percona-platform/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
     - name: Run checks
       env:
         REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
