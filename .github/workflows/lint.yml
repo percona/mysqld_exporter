@@ -1,0 +1,34 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+    strategy:
+      matrix:
+        go-version:
+          - 1.17.5
+        include:
+          - go-version: tip
+            os: ubuntu-latest
+            mysql-image: percona:8.0
+            may-fail: true
+    runs-on: ubuntu-latest
+    # The environment this job references
+    environment:
+      name: CI
+    steps:
+    - name: Checkout code
+      uses: percona-platform/checkout@v2
+    - name: Run checks
+      env:
+        REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        make lint CI=true
