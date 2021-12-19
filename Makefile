@@ -90,7 +90,7 @@ lint: lint-install
 	@echo ">> running lint checks"
 ifeq ($(CI), true)
 	bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-	bin/golangci-lint run -c=.golangci.yml --out-format=line-number | bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+	bin/golangci-lint run -c=.golangci.yml --out-format=line-number | 	bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
 else
 	bin/golangci-lint run -c=.golangci-required.yml
 	bin/golangci-lint run -c=.golangci.yml

@@ -41,7 +41,6 @@ jobs:
     # The environment this job references
     environment:
       name: CI
-      REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Set up Go release
       if: matrix.go-version != 'tip'
@@ -62,6 +61,8 @@ jobs:
     - name: Checkout code
       uses: percona-platform/checkout@v2
     - name: Run checks
+      env:
+        REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         make lint CI=true
     - name: Run Tests
