@@ -81,6 +81,26 @@ promu:            ## Install promu
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
 		$(GO) build -modfile=tools/go.mod -o bin/promu github.com/prometheus/promu
 
+lint-install:
+	@echo ">> installing lint tools"
+	$(GO) build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+	$(GO) build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+
+lint: lint-install
+	@echo ">> running lint checks"
+ifeq ($(CI), true)
+	bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+	bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+else
+	bin/golangci-lint run -c=.golangci-required.yml
+	bin/golangci-lint run -c=.golangci.yml
+endif
+
+lint-fix: lint-install
+	@echo ">> running lint fix"
+	bin/golangci-lint run -c=.golangci-required.yml --fix
+	bin/golangci-lint run -c=.golangci.yml --fix
+
 help:             ## Display this help message.
 	@echo "$(TMPDIR)"
 	@echo "Please use \`make <target>\` where <target> is one of:"
