@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.16
+          - 1.17
         mysql-image:
           - mysql/mysql-server:5.5
           - mysql/mysql-server:5.6
