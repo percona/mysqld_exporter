@@ -69,7 +69,7 @@ func chooseQuery(ctx context.Context, db *sql.DB) (string, error) {
 	if err := db.QueryRowContext(ctx, "SELECT @@version, @@version_comment").Scan(&version, &versionComment); err != nil {
 		return "", err
 	}
-	log.Infof("database version %s, distro %s", version, versionComment)
+	log.Debugf("database version %s, distro %s", version, versionComment)
 
 	query := "SHOW SLAVE STATUS"
 	switch {
