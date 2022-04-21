@@ -386,6 +386,7 @@ func main() {
 		scraperFlags[scraper] = f
 	}
 
+	log.AddFlags(kingpin.CommandLine)
 	// Parse flags.
 	kingpin.Parse()
 
