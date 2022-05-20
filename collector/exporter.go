@@ -52,6 +52,9 @@ var (
 		"exporter.log_slow_filter",
 		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
 	).Default("false").Bool()
+	collectorFailuresAsError = kingpin.Flag(
+		"collector.failures.error",
+		"Log collector failures as errors (Debug by default)").Bool()
 )
 
 // metric definition
@@ -165,7 +168,11 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) floa
 			scrapeTime := time.Now()
 			collectorSuccess := 1.0
 			if err := scraper.Scrape(ctx, instance, ch, e.logger.With("scraper", scraper.Name())); err != nil {
-				e.logger.Error("Error from scraper", "scraper", scraper.Name(), "target", e.getTargetFromDsn(), "err", err)
+				if *collectorFailuresAsError {
+					e.logger.Error("Error from scraper", "scraper", scraper.Name(), "target", e.getTargetFromDsn(), "err", err)
+				} else {
+					e.logger.Debug("Error from scraper", "scraper", scraper.Name(), "target", e.getTargetFromDsn(), "err", err)
+				}
 				collectorSuccess = 0.0
 			}
 			ch <- prometheus.MustNewConstMetric(mysqlScrapeCollectorSuccess, prometheus.GaugeValue, collectorSuccess, label)
