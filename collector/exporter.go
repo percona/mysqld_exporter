@@ -38,7 +38,7 @@ const (
 
 // SQL Queries.
 const (
-	versionQuery = `SELECT @@version`
+	versionQuery = `SELECT @@version, @@version_comment`
 )
 
 var (
@@ -121,6 +121,7 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, time.Since(scrapeTime).Seconds(), "connection")
 
 	version := getMySQLVersion(e.db, e.logger)
+
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	for _, scraper := range e.scrapers {
@@ -155,8 +156,12 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) {
 
 func getMySQLVersion(db *sql.DB, logger log.Logger) float64 {
 	var versionStr string
+	var versionComment string
 	var versionNum float64
-	if err := db.QueryRow(versionQuery).Scan(&versionStr); err == nil {
+
+	if err := db.QueryRow(versionQuery).Scan(&versionStr, &versionComment); err == nil {
+		level.Info(logger).Log("database version", versionStr, "distro", versionComment)
+
 		versionNum, _ = strconv.ParseFloat(versionRE.FindString(versionStr), 64)
 	} else {
 		level.Debug(logger).Log("msg", "Error querying version", "err", err)
