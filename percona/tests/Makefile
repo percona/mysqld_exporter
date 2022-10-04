@@ -22,7 +22,7 @@ test-resolutions:
 	go test -v -run '^TestResolutions$$' -args -doRun=true
 
 dump-metrics:
-	go test -v -run '^TestDumpMetrics$$' -args -doRun=true -extraMetrics=$(extraMetrics) -multipleLabels=$(multipleLabels) -dumpMetrics=$(dumpMetrics)
+	go test -v -run '^TestDumpMetrics$$' -args -doRun=true -extraMetrics=$(extraMetrics) -multipleLabels=$(multipleLabels) -dumpMetrics=true
 
 test-consistency: test-metrics test-resolutions test-resolutions-duplicates
 
