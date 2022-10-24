@@ -18,7 +18,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.10
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/ini.v1 v1.66.6
+	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
