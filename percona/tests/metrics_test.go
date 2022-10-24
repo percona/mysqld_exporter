@@ -310,6 +310,11 @@ func testForMissingMetricsLabels(oldMetricsCollection, newMetricsCollection Metr
 func testForMissingMetrics(oldMetricsCollection, newMetricsCollection MetricsCollection) (bool, string) {
 	missingMetrics := make([]string, 0)
 	for metricName := range oldMetricsCollection.LabelsByMetric {
+		// disabled by default in client_golang starting from 1.12.2. We don't use it either
+		if metricName == "go_memstats_gc_cpu_fraction" {
+			continue
+		}
+
 		if _, ok := newMetricsCollection.LabelsByMetric[metricName]; !ok {
 			missingMetrics = append(missingMetrics, metricName)
 		}
