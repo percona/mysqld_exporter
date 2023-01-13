@@ -32,5 +32,5 @@ GO_BUILD_LDFLAGS = -X github.com/prometheus/common/version.Version=$(shell cat V
 
 export PMM_RELEASE_PATH?=.
 
-feature-build:
+release:
 	go build -ldflags="$(GO_BUILD_LDFLAGS)" -o $(PMM_RELEASE_PATH)/mysqld_exporter
