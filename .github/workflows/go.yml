@@ -16,11 +16,11 @@ jobs:
         go-version:
           - 1.17
         mysql-image:
-          - mysql/mysql-server:5.5
+#          - mysql/mysql-server:5.5
           - mysql/mysql-server:5.6
           - mysql/mysql-server:5.7
           - mysql/mysql-server:8.0
-          - mariadb:5.5
+#          - mariadb:5.5
           - mariadb:10.0
           - mariadb:10.1
           - mariadb:10.2
@@ -28,7 +28,7 @@ jobs:
           - percona/percona-server:5.6
           - percona/percona-server:5.7
           - percona/percona-server:8.0
-          - percona:5.5
+#          - percona:5.5
           - percona:5.6
           - percona:5.7
           - percona:8.0
