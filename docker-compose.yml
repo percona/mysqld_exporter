@@ -3,11 +3,13 @@
 version: '3'
 services:
   mysql:
-    image: ${MYSQL_IMAGE:-mysql/mysql-server:5.7}
+    image: ${MYSQL_IMAGE:-mysql/mysql-server:8.0.32}
     container_name: mysqld_exporter_db
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_ROOT_HOST=%
       - INIT_ROCKSDB=1
+    volumes:
+      - ./test-db-init:/docker-entrypoint-initdb.d
     ports:
-      - 127.0.0.1:3306:3306
+      - "3306:3306"
