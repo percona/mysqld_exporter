@@ -13,8 +13,6 @@ jobs:
     name: Test
     strategy:
       matrix:
-        go-version:
-          - 1.17
         mysql-image:
           - mysql/mysql-server:5.5
           - mysql/mysql-server:5.6
@@ -33,18 +31,15 @@ jobs:
           - percona:5.7
           - percona:8.0
     runs-on: ubuntu-latest
-    # The environment this job references
-    environment:
-      name: CI
 
     steps:
-      - name: Set up Go release
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: ${{ github.workspace }}/go.mod
 
       - name: Run checks
         run: |
@@ -55,7 +50,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          docker-compose up -d
+          docker compose up -d
           make all
           make test
         env:
@@ -70,4 +65,4 @@ jobs:
           pwd
           git status
           docker --version
-          docker-compose --version
+          docker compose --version
