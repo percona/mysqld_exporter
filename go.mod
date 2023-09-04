@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/go-kit/log v0.2.1
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.7.1
 	github.com/google/uuid v1.3.0
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pkg/errors v0.9.1
