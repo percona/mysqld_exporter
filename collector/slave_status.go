@@ -112,6 +112,7 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 			return err
 		}
 
+		masterServerID := columnValue(scanArgs, slaveCols, "Master_Server_Id")
 		masterUUID := columnValue(scanArgs, slaveCols, "Master_UUID")
 		masterHost := columnValue(scanArgs, slaveCols, "Master_Host")
 		channelName := columnValue(scanArgs, slaveCols, "Channel_Name")       // MySQL & Percona
@@ -123,12 +124,12 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 					prometheus.NewDesc(
 						prometheus.BuildFQName(namespace, slaveStatus, strings.ToLower(col)),
 						"Generic metric from SHOW SLAVE STATUS.",
-						[]string{"master_host", "master_uuid", "channel_name", "connection_name"},
+						[]string{"master_host", "master_server_id", "master_uuid", "channel_name", "connection_name"},
 						nil,
 					),
 					prometheus.UntypedValue,
 					value,
-					masterHost, masterUUID, channelName, connectionName,
+					masterHost, masterServerID, masterUUID, channelName, connectionName,
 				)
 			}
 		}
