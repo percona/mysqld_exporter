@@ -9,8 +9,6 @@ import (
 )
 
 const (
-	collector = "dba"
-
 	statColumnCapacityQuery = `
 		SELECT
 		   db_name table_schema,
@@ -22,7 +20,7 @@ const (
 
 var (
 	globalStatColumnCapacityDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, collector, "stat_column_capacity"),
+		prometheus.BuildFQName(namespace, "", "dba_stat_column_capacity"),
 		"The current capacity of intager columns.",
 		[]string{"schema", "table", "column"}, nil,
 	)
