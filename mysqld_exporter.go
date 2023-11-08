@@ -43,6 +43,7 @@ import (
 
 	"github.com/percona/mysqld_exporter/collector"
 	pcl "github.com/percona/mysqld_exporter/percona/perconacollector"
+	dba "github.com/a-korotich/mysqld_exporter/collector"
 )
 
 var (
@@ -168,7 +169,6 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeInfoSchemaInnodbTablespaces{}:         false,
 	collector.ScrapeInnodbMetrics{}:                       false,
 	collector.ScrapeAutoIncrementColumns{}:                false,
-	collector.ScrapeStatColumnCapacityColumns{}:           false,
 	collector.ScrapeBinlogSize{}:                          false,
 	collector.ScrapePerfTableIOWaits{}:                    false,
 	collector.ScrapePerfIndexIOWaits{}:                    false,
@@ -201,6 +201,7 @@ var scrapers = map[collector.Scraper]bool{
 	pcl.ScrapeCustomQuery{Resolution: pcl.LR}:             false,
 	pcl.NewStandardGo():                                   false,
 	pcl.NewStandardProcess():                              false,
+	dba.ScrapeStatColumnCapacityColumns()                  false,
 }
 
 // TODO Remove
@@ -230,7 +231,7 @@ var scrapersLr = map[collector.Scraper]struct{}{
 	collector.ScrapePlugins{}:                     {},
 	collector.ScrapeTableSchema{}:                 {},
 	collector.ScrapeAutoIncrementColumns{}:        {},
-	collector.ScrapeStatColumnCapacityColumns{}:   {},
+ 
 	collector.ScrapeBinlogSize{}:                  {},
 	collector.ScrapePerfTableIOWaits{}:            {},
 	collector.ScrapePerfIndexIOWaits{}:            {},
