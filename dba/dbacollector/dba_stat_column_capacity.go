@@ -1,4 +1,4 @@
-package collector
+package dbacollector
 
 import (
 	"context"
