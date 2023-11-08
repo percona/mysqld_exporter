@@ -201,7 +201,7 @@ var scrapers = map[collector.Scraper]bool{
 	pcl.ScrapeCustomQuery{Resolution: pcl.LR}:             false,
 	pcl.NewStandardGo():                                   false,
 	pcl.NewStandardProcess():                              false,
-	dba.ScrapeStatColumnCapacityColumns()                  false,
+	dba.ScrapeStatColumnCapacityColumns{}:                 true,
 }
 
 // TODO Remove
