@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	name = dba
+	name = "dba"
 	statColumnCapacityQuery = `
 		SELECT
 		   db_name table_schema,
