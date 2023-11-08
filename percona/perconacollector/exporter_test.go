@@ -18,7 +18,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-kit/log"
-	cl "github.com/percona/mysqld_exporter/collector"
+	cl "github.com/a-korotich/mysqld_exporter/collector"
 	"github.com/smartystreets/goconvey/convey"
 )
 

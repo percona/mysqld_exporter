@@ -41,8 +41,8 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/ini.v1"
 
-	"github.com/percona/mysqld_exporter/collector"
-	pcl "github.com/percona/mysqld_exporter/percona/perconacollector"
+	"github.com/a-korotich/mysqld_exporter/collector"
+	pcl "github.com/a-korotich/mysqld_exporter/percona/perconacollector"
 	dba "github.com/a-korotich/mysqld_exporter/dba/dbacollector"
 )
 
