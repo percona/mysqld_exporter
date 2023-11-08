@@ -20,7 +20,7 @@ const (
 
 var (
 	globalStatColumnCapacityDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "dba_stat_column_capacity"),
+		prometheus.BuildFQName(namespace, "dba", "stat_column_capacity"),
 		"The current capacity of intager columns.",
 		[]string{"schema", "table", "column"}, nil,
 	)
