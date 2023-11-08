@@ -21,7 +21,7 @@ const (
 
 var (
 	globalStatColumnCapacityDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, cl.Namespace, "dba_stat_column_capacity"),
+		prometheus.BuildFQName(cl.Namespace, "dba", "stat_column_capacity"),
 		"The current capacity of intager columns.",
 		[]string{"schema", "table", "column"}, nil,
 	)
@@ -31,7 +31,7 @@ type ScrapeStatColumnCapacityColumns struct{}
 
 // Name of the Scraper. Should be unique.
 func (ScrapeStatColumnCapacityColumns) Name() string {
-	return "current_value.columns"
+	return "dba.stat_column_capacity"
 }
 
 // Help describes the role of the Scraper.
