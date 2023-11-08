@@ -23,7 +23,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	cl "github.com/percona/mysqld_exporter/collector"
+	cl "github.com/a-korotich/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
