@@ -43,7 +43,7 @@ import (
 
 	"github.com/percona/mysqld_exporter/collector"
 	pcl "github.com/percona/mysqld_exporter/percona/perconacollector"
-	dba "github.com/a-korotich/mysqld_exporter/collector"
+	dba "github.com/a-korotich/mysqld_exporter/dba/dbacollector"
 )
 
 var (
