@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/go-kit/log"
+	cl "github.com/a-korotich/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -20,7 +21,7 @@ const (
 
 var (
 	globalStatColumnCapacityDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "dba", "stat_column_capacity"),
+		prometheus.BuildFQName(namespace, cl.Namespace, "dba_stat_column_capacity"),
 		"The current capacity of intager columns.",
 		[]string{"schema", "table", "column"}, nil,
 	)
@@ -70,4 +71,4 @@ func (ScrapeStatColumnCapacityColumns) Scrape(ctx context.Context, db *sql.DB, c
 	return nil
 }
 
-var _ Scraper = ScrapeStatColumnCapacityColumns{}
+var _ cl.Scraper = ScrapeStatColumnCapacityColumns{}
