@@ -1,4 +1,4 @@
-module github.com/percona/mysqld_exporter
+module github.com/a-korotich/mysqld_exporter
 
 go 1.17
 
