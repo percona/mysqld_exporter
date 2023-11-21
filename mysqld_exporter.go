@@ -147,11 +147,12 @@ type basicAuthHandler struct {
 
 func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	user, password, ok := r.BasicAuth()
-	// if !ok || password != h.password || user != h.user {
+	if !ok || password != h.password || user != h.user {
 	// 	w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
 	// 	http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 	// 	return
-	// }
+		continue
+	}
 	h.handler(w, r)
 }
 
