@@ -147,17 +147,17 @@ type basicAuthHandler struct {
 
 func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	user, password, ok := r.BasicAuth()
-	if !ok || password != h.password || user != h.user {
-		w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
-	}
+	// if !ok || password != h.password || user != h.user {
+	// 	w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
+	// 	http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+	// 	return
+	// }
 	h.handler(w, r)
 }
 
 // scrapers lists all possible collection methods and if they should be enabled by default.
 var scrapers = map[collector.Scraper]bool{
-	dba.ScrapeStatColumnCapacityColumns{}:                 false,
+	dba.ScrapeStatColumnCapacityColumns{}:                 true,
 	pcl.ScrapeGlobalStatus{}:                              false,
 	collector.ScrapeGlobalStatus{}:                        false,
 	collector.ScrapeGlobalVariables{}:                     false,
