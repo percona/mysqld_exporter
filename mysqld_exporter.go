@@ -122,6 +122,7 @@ var (
 		"Ignore certificate and server verification when using a tls connection.",
 	).Bool()
 	dsn string
+	foo = ''
 )
 
 // SQL queries and parameters.
