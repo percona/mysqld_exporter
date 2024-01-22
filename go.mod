@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.7.3
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.4.0
-	github.com/tklauser/go-sysconf v0.3.12
+	github.com/tklauser/go-sysconf v0.3.13
 	golang.org/x/sys v0.16.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/ini.v1 v1.66.6
@@ -38,7 +38,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/smarty/assertions v1.15.0 // indirect
-	github.com/tklauser/numcpus v0.6.1 // indirect
+	github.com/tklauser/numcpus v0.7.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
