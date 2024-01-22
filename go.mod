@@ -16,7 +16,7 @@ require (
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/stretchr/testify v1.4.0
 	github.com/tklauser/go-sysconf v0.3.12
-	golang.org/x/sys v0.13.0
+	golang.org/x/sys v0.16.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/ini.v1 v1.66.6
 	gopkg.in/yaml.v2 v2.4.0
