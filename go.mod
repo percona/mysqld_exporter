@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/exporter-toolkit v0.7.3
 	github.com/smartystreets/goconvey v1.8.1
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.8.4
 	github.com/tklauser/go-sysconf v0.3.13
 	golang.org/x/sys v0.16.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -45,4 +45,5 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
