@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/go-sql-driver/mysql"
@@ -38,7 +39,6 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/ini.v1"
 
 	"github.com/percona/mysqld_exporter/collector"
@@ -46,15 +46,11 @@ import (
 )
 
 var (
-	webConfig     = webflag.AddFlags(kingpin.CommandLine)
+	webConfig     = webflag.AddFlags(kingpin.CommandLine, ":9104")
 	webConfigFile = kingpin.Flag(
 		"web.config",
 		"[EXPERIMENTAL] Path to config yaml file that can enable TLS or authentication.",
 	).Default("").String()
-	listenAddress = kingpin.Flag(
-		"web.listen-address",
-		"Address to listen on for web interface and telemetry.",
-	).Default(":9104").String()
 	metricPath = kingpin.Flag(
 		"web.telemetry-path",
 		"Path under which to expose metrics.",
@@ -607,33 +603,28 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    *listenAddress,
 		Handler: mux,
 	}
 
-	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
+	level.Info(logger).Log("msg", "Listening on", "address", *webConfig.WebListenAddresses)
 
-	if *webConfigFile != "" && *webConfig != "" {
+	if *webConfigFile != "" && *webConfig.WebConfigFile != "" {
 		level.Error(logger).Log("msg", "Should specify only one web-config file")
 		os.Exit(1)
 	}
 
-	webCfg := ""
 	if *webConfigFile != "" {
-		webCfg = *webConfigFile
-	}
-	if *webConfig != "" {
-		webCfg = *webConfig
+		webConfig.WebConfigFile = webConfigFile
 	}
 
-	if webCfg != "" {
+	if *webConfig.WebConfigFile != "" {
 		// https
 		mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 			w.Write(landingPage)
 		})
 
-		level.Error(logger).Log("error", web.ListenAndServe(srv, webCfg, logger))
+		level.Error(logger).Log("error", web.ListenAndServe(srv, webConfig, logger))
 	} else {
 		// http
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
