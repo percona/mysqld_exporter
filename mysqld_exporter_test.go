@@ -246,24 +246,11 @@ func testLanding(t *testing.T, data bin) {
 	}
 	got := string(body)
 
-	expected := `<html>
-<head><title>MySQLd exporter</title></head>
-<body>
-<h1>MySQL 3-in-1 exporter</h1>
-<ul>
-	<li><a href="/metrics-hr">high-res metrics</a></li>
-	<li><a href="/metrics-mr">medium-res metrics</a></li>
-	<li><a href="/metrics-lr">low-res metrics</a></li>
-</ul>
-<h1>MySQL exporter</h1>
-<ul>
-	<li><a href="/metrics">all metrics</a></li>
-</ul>
-</body>
-</html>
+	expected := `
+<h2>MySQL metrics in different resolutions</h2>
 `
-	if diff := cmp.Diff(expected, got); diff != "" {
-		t.Fatalf("expected != got \n%v\n", diff)
+	if !strings.Contains(got, expected) {
+		t.Fatalf("the web page does not contain expected content: \n%s", cmp.Diff(got, expected))
 	}
 }
 

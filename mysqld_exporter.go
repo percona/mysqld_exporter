@@ -485,13 +485,13 @@ func main() {
 
 	// landingPage contains the ExtraHTML element part of the index page to be rendered at '/'.
 	var landingPage = []byte(`
-		<h2>MySQL metrics in different resolutions</h2>
-		<ul>
-			<li><a href="` + *metricsPath + `-hr">high-res metrics</a></li>
-			<li><a href="` + *metricsPath + `-mr">medium-res metrics</a></li>
-			<li><a href="` + *metricsPath + `-lr">low-res metrics</a></li>
-		</ul>`,
-	)
+<h2>MySQL metrics in different resolutions</h2>
+<ul>
+	<li><a href="` + *metricsPath + `-hr">high-res metrics</a></li>
+	<li><a href="` + *metricsPath + `-mr">medium-res metrics</a></li>
+	<li><a href="` + *metricsPath + `-lr">low-res metrics</a></li>
+</ul>
+`)
 
 	logger.Info("Starting mysqld_exporter", "version", version.Info())
 	logger.Info("Build context", "build_context", version.BuildContext())
