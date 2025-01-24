@@ -29,8 +29,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/log"
 	"github.com/smartystreets/goconvey/convey"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/percona/mysqld_exporter/collector"
+	"github.com/prometheus/common/promslog"
 )
 
 func TestParseMycnf(t *testing.T) {
@@ -101,47 +104,47 @@ func TestParseMycnf(t *testing.T) {
 	)
 	convey.Convey("Various .my.cnf configurations", t, func() {
 		convey.Convey("Local tcp connection", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(tcpConfig), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
 		})
 		convey.Convey("Local tcp connection on non-default port", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig2), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(tcpConfig2), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3308)/")
 		})
 		convey.Convey("Authentication with client certificate and no password", func() {
-			dsn, _ := parseMycnf([]byte(clientAuthConfig), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(clientAuthConfig), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "root@tcp(localhost:3308)/")
 		})
 		convey.Convey("Socket connection", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(socketConfig), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "user:pass@unix(/var/lib/mysql/mysql.sock)/")
 		})
 		convey.Convey("Socket connection ignoring defined host", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig2), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(socketConfig2), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@unix(/var/lib/mysql/mysql.sock)/")
 		})
 		convey.Convey("Remote connection", func() {
-			dsn, _ := parseMycnf([]byte(remoteConfig), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(remoteConfig), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@tcp(1.2.3.4:3307)/")
 		})
 		convey.Convey("Ignore boolean keys", func() {
-			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys), log.NewNopLogger())
+			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys), promslog.NewNopLogger())
 			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
 		})
 		convey.Convey("Missed user", func() {
-			_, err := parseMycnf([]byte(badConfig), log.NewNopLogger())
+			_, err := parseMycnf([]byte(badConfig), promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("password or ssl-key should be specified under [client] in %s", badConfig))
 		})
 		convey.Convey("Missed password", func() {
-			_, err := parseMycnf([]byte(badConfig2), log.NewNopLogger())
+			_, err := parseMycnf([]byte(badConfig2), promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig2))
 		})
 		convey.Convey("No [client] section", func() {
-			_, err := parseMycnf([]byte(badConfig3), log.NewNopLogger())
+			_, err := parseMycnf([]byte(badConfig3), promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig3))
 		})
 		convey.Convey("Invalid config", func() {
-			_, err := parseMycnf([]byte(badConfig4), log.NewNopLogger())
+			_, err := parseMycnf([]byte(badConfig4), promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, fmt.Errorf("failed reading ini file: unclosed section: %s", badConfig4))
 		})
 	})
@@ -169,7 +172,7 @@ func TestBin(t *testing.T) {
 		}
 	}()
 
-	importpath := "github.com/prometheus/mysqld_exporter/vendor/github.com/prometheus/common"
+	importpath := "github.com/prometheus/common"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
 		importpath + "/version.Version":  "gotest-version",
@@ -196,7 +199,8 @@ func TestBin(t *testing.T) {
 	}
 
 	tests := []func(*testing.T, bin){
-		testLandingPage,
+		testLanding,
+		testProbe,
 	}
 
 	portStart := 56000
@@ -217,7 +221,7 @@ func TestBin(t *testing.T) {
 	})
 }
 
-func testLandingPage(t *testing.T, data bin) {
+func testLanding(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -226,10 +230,8 @@ func testLandingPage(t *testing.T, data bin) {
 		ctx,
 		data.path,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
+		"--config.my-cnf=test_exporter.cnf",
 	)
-	cmd.Env = append(os.Environ(), "DATA_SOURCE_NAME=tcp:(127.0.0.1:3306)/")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -260,6 +262,38 @@ func testLandingPage(t *testing.T, data bin) {
 </body>
 </html>
 `
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Fatalf("expected != got \n%v\n", diff)
+	}
+}
+
+func testProbe(t *testing.T, data bin) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Run exporter.
+	cmd := exec.CommandContext(
+		ctx,
+		data.path,
+		"--web.listen-address", fmt.Sprintf(":%d", data.port),
+		"--config.my-cnf=test_exporter.cnf",
+	)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	// Get the main page.
+	urlToGet := fmt.Sprintf("http://127.0.0.1:%d/probe", data.port)
+	body, err := waitForBody(urlToGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(string(body))
+
+	expected := `target is required`
+
 	if got != expected {
 		t.Fatalf("got '%s' but expected '%s'", got, expected)
 	}
@@ -311,4 +345,127 @@ func getBody(urlToGet string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func Test_filterScrapers(t *testing.T) {
+	type args struct {
+		scrapers      []collector.Scraper
+		collectParams []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []collector.Scraper
+	}{
+		{"args_appears_in_collector",
+			args{
+				[]collector.Scraper{collector.ScrapeGlobalStatus{}},
+				[]string{collector.ScrapeGlobalStatus{}.Name()},
+			},
+			[]collector.Scraper{
+				collector.ScrapeGlobalStatus{},
+			}},
+		{"args_absent_in_collector",
+			args{
+				[]collector.Scraper{collector.ScrapeGlobalStatus{}},
+				[]string{collector.ScrapeGlobalVariables{}.Name()},
+			},
+			[]collector.Scraper{collector.ScrapeGlobalStatus{}}},
+		{"respect_params",
+			args{
+				[]collector.Scraper{
+					collector.ScrapeGlobalStatus{},
+					collector.ScrapeGlobalVariables{},
+				},
+				[]string{collector.ScrapeGlobalStatus{}.Name()},
+			},
+			[]collector.Scraper{
+				collector.ScrapeGlobalStatus{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := filterScrapers(tt.args.scrapers, tt.args.collectParams); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterScrapers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getScrapeTimeoutSeconds(t *testing.T) {
+	type args struct {
+		timeoutHeader string
+		offset        float64
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantTimeout float64
+		wantErr     bool
+	}{
+		{"no_timeout_header",
+			args{},
+			0, false,
+		},
+		{"zero_timeout_header",
+			args{
+				timeoutHeader: "0",
+			},
+			0, false,
+		},
+		{"negative_timeout_header",
+			args{
+				timeoutHeader: "-5",
+			},
+			0, true,
+		},
+		{"offset_greater_than_timeout",
+			args{
+				timeoutHeader: "5",
+				offset:        6,
+			},
+			0, true,
+		},
+		{"offset_equal_timeout",
+			args{
+				timeoutHeader: "5",
+				offset:        5,
+			},
+			0, true,
+		},
+		{"offset_less_than_timeout",
+			args{
+				timeoutHeader: "5",
+				offset:        1,
+			},
+			4, false,
+		},
+		{"no_offset",
+			args{
+				timeoutHeader: "5",
+			},
+			5, false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request, err := http.NewRequest(http.MethodGet, "", nil)
+			if err != nil {
+				t.Fatalf("unexpected error creating http request: %v", err)
+			}
+			request.Header.Set("X-Prometheus-Scrape-Timeout-Seconds", tt.args.timeoutHeader)
+
+			timeout, err := getScrapeTimeoutSeconds(request, tt.args.offset)
+			if err != nil && !tt.wantErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err == nil && tt.wantErr {
+				t.Fatal("expecting an error, got nil")
+			}
+			if timeout != tt.wantTimeout {
+				t.Fatalf("unexpected timeout, got '%f' but expected '%f'", timeout, tt.wantTimeout)
+			}
+		})
+	}
 }

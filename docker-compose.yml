@@ -1,6 +1,5 @@
 # see CONTRIBUTING.md
 ---
-version: '3'
 services:
   mysql:
     image: ${MYSQL_IMAGE:-mysql/mysql-server:8.0.32}

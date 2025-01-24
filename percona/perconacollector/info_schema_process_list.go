@@ -17,14 +17,13 @@ package perconacollector
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/log"
+	"github.com/alecthomas/kingpin/v2"
 	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const infoSchemaProcesslistQuery = `
@@ -186,11 +185,12 @@ func (ScrapeProcesslist) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeProcesslist) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeProcesslist) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	processQuery := fmt.Sprintf(
 		infoSchemaProcesslistQuery,
 		*processlistMinTime,
 	)
+	db := instance.GetDB()
 	processlistRows, err := db.QueryContext(ctx, processQuery)
 	if err != nil {
 		return err

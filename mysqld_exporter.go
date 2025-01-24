@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -28,34 +29,30 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
+	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/promslog"
+	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/ini.v1"
 
 	"github.com/percona/mysqld_exporter/collector"
+	"github.com/percona/mysqld_exporter/config"
 	pcl "github.com/percona/mysqld_exporter/percona/perconacollector"
 )
 
 var (
-	webConfig     = webflag.AddFlags(kingpin.CommandLine)
-	webConfigFile = kingpin.Flag(
+	// TODO: remove later. It's here for backward compatibility.
+	webConfig = kingpin.Flag(
 		"web.config",
-		"[EXPERIMENTAL] Path to config yaml file that can enable TLS or authentication.",
+		"[DEPRECATED] Path to config yaml file that can enable TLS or authentication.",
 	).Default("").String()
-	listenAddress = kingpin.Flag(
-		"web.listen-address",
-		"Address to listen on for web interface and telemetry.",
-	).Default(":9104").String()
-	metricPath = kingpin.Flag(
+	metricsPath = kingpin.Flag(
 		"web.telemetry-path",
 		"Path under which to expose metrics.",
 	).Default("/metrics").String()
@@ -68,14 +65,6 @@ var (
 		"Path to .my.cnf file to read MySQL credentials from.",
 	).Default(path.Join(os.Getenv("HOME"), ".my.cnf")).String()
 
-	exporterLockTimeout = kingpin.Flag(
-		"exporter.lock_wait_timeout",
-		"Set a lock_wait_timeout (in seconds) on the connection to avoid long metadata locking.",
-	).Default("2").Int()
-	exporterLogSlowFilter = kingpin.Flag(
-		"exporter.log_slow_filter",
-		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
-	).Default("false").Bool()
 	exporterGlobalConnPool = kingpin.Flag(
 		"exporter.global-conn-pool",
 		"Use global connection pool instead of creating new pool for each http request.",
@@ -116,43 +105,36 @@ var (
 		"mysql.ssl-skip-verify",
 		"Skip cert verification when connection to MySQL",
 	).Bool()
+
+	mysqldAddress = kingpin.Flag(
+		"mysqld.address",
+		"Address to use for connecting to MySQL",
+	).Default("localhost:3306").String()
+	mysqldUser = kingpin.Flag(
+		"mysqld.username",
+		"Username to use for connecting to MySQL",
+	).String()
 	tlsInsecureSkipVerify = kingpin.Flag(
 		"tls.insecure-skip-verify",
 		"Ignore certificate and server verification when using a tls connection.",
 	).Bool()
-	dsn string
-)
 
-// SQL queries and parameters.
-const (
-	versionQuery = `SELECT @@version`
-
-	// System variable params formatting.
-	// See: https://github.com/go-sql-driver/mysql#system-variables
-	sessionSettingsParam = `log_slow_filter=%27tmp_table_on_disk,filesort_on_disk%27`
-	timeoutParam         = `lock_wait_timeout=%d`
-)
-
-type webAuth struct {
-	User     string `yaml:"server_user,omitempty"`
-	Password string `yaml:"server_password,omitempty"`
-}
-
-type basicAuthHandler struct {
-	handler  http.HandlerFunc
-	user     string
-	password string
-}
-
-func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	user, password, ok := r.BasicAuth()
-	if !ok || password != h.password || user != h.user {
-		w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
+	// This add the following flags: `--web.listen-address`, `--web.config.file`, `--web.systemd-socket (linux-only)`
+	toolkitFlags = webflag.AddFlags(kingpin.CommandLine, ":9104")
+	c            = config.MySqlConfigHandler{
+		Config: &config.Config{},
 	}
-	h.handler(w, r)
+)
+
+type errLogger struct {
+	logger *slog.Logger
 }
+
+func (el *errLogger) Println(v ...interface{}) {
+	el.logger.Error(fmt.Sprint(v...))
+}
+
+var _ promhttp.Logger = &errLogger{}
 
 // scrapers lists all possible collection methods and if they should be enabled by default.
 var scrapers = map[collector.Scraper]bool{
@@ -181,6 +163,7 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapePerfReplicationGroupMembers{}:         false,
 	collector.ScrapePerfReplicationGroupMemberStats{}:     false,
 	collector.ScrapePerfReplicationApplierStatsByWorker{}: false,
+	collector.ScrapeSysUserSummary{}:                      false,
 	collector.ScrapeUserStat{}:                            false,
 	collector.ScrapeClientStat{}:                          false,
 	collector.ScrapeTableStat{}:                           false,
@@ -243,7 +226,7 @@ var scrapersLr = map[collector.Scraper]struct{}{
 	pcl.ScrapeCustomQuery{Resolution: pcl.LR}:     {},
 }
 
-func parseMycnf(config interface{}, logger log.Logger) (string, error) {
+func parseMycnf(config interface{}, logger *slog.Logger) (string, error) {
 	var dsn string
 	opts := ini.LoadOptions{
 		// MySQL ini file can have boolean keys.
@@ -289,7 +272,7 @@ func parseMycnf(config interface{}, logger log.Logger) (string, error) {
 		}
 	}
 
-	level.Debug(logger).Log("dsn", dsn)
+	logger.Debug("", "dsn", dsn)
 	return dsn, nil
 }
 
@@ -322,6 +305,54 @@ func customizeTLS(sslCA string, sslCert string, sslKey string) error {
 	return mysql.RegisterTLSConfig("custom", &tlsCfg)
 }
 
+func filterScrapers(scrapers []collector.Scraper, collectParams []string) []collector.Scraper {
+	var filteredScrapers []collector.Scraper
+
+	// Check if we have some "collect[]" query parameters.
+	if len(collectParams) > 0 {
+		filters := make(map[string]bool)
+		for _, param := range collectParams {
+			filters[param] = true
+		}
+
+		for _, scraper := range scrapers {
+			if filters[scraper.Name()] {
+				filteredScrapers = append(filteredScrapers, scraper)
+			}
+		}
+	}
+	if len(filteredScrapers) == 0 {
+		return scrapers
+	}
+	return filteredScrapers
+}
+
+func getScrapeTimeoutSeconds(r *http.Request, offset float64) (float64, error) {
+	var timeoutSeconds float64
+	if v := r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"); v != "" {
+		var err error
+		timeoutSeconds, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse timeout from Prometheus header: %v", err)
+		}
+	}
+	if timeoutSeconds == 0 {
+		return 0, nil
+	}
+	if timeoutSeconds < 0 {
+		return 0, fmt.Errorf("timeout value from Prometheus header is invalid: %f", timeoutSeconds)
+	}
+
+	if offset >= timeoutSeconds {
+		// Ignore timeout offset if it doesn't leave time to scrape.
+		return 0, fmt.Errorf("timeout offset (%f) should be lower than prometheus scrape timeout (%f)", offset, timeoutSeconds)
+	} else {
+		// Subtract timeout offset from timeout.
+		timeoutSeconds -= offset
+	}
+	return timeoutSeconds, nil
+}
+
 func setTLSConfig(dsn string) (string, error) {
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
@@ -333,98 +364,81 @@ func setTLSConfig(dsn string) (string, error) {
 }
 
 func init() {
-	prometheus.MustRegister(version.NewCollector("mysqld_exporter"))
+	prometheus.MustRegister(versioncollector.NewCollector("mysqld_exporter"))
 }
 
-func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []collector.Scraper, defaultGatherer bool, logger log.Logger) http.HandlerFunc {
+func newHandler(metrics collector.Metrics, scrapers []collector.Scraper, defaultGatherer bool, logger *slog.Logger) http.HandlerFunc {
 	var processing_lr, processing_mr, processing_hr uint32 = 0, 0, 0 // default value is already 0, but for extra clarity
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		query_collect := r.URL.Query().Get("collect[]")
+		q := r.URL.Query()
+		query_collect := q.Get("collect[]")
+
 		switch query_collect {
 		case "custom_query.hr":
 			if !atomic.CompareAndSwapUint32(&processing_hr, 0, 1) {
-				level.Warn(logger).Log("msg", "Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
+				logger.Warn("Received metrics HR request while previous still in progress: returning 429 Too Many Requests")
 				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 			defer atomic.StoreUint32(&processing_hr, 0)
 		case "custom_query.mr":
 			if !atomic.CompareAndSwapUint32(&processing_mr, 0, 1) {
-				level.Warn(logger).Log("msg", "Received metrics MR request while previous still in progress: returning 429 Too Many Requests")
+				logger.Warn("Received metrics MR request while previous still in progress: returning 429 Too Many Requests")
 				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 			defer atomic.StoreUint32(&processing_mr, 0)
 		case "custom_query.lr":
 			if !atomic.CompareAndSwapUint32(&processing_lr, 0, 1) {
-				level.Warn(logger).Log("msg", "Received metrics LR request while previous still in progress: returning 429 Too Many Requests")
+				logger.Warn("Received metrics LR request while previous still in progress: returning 429 Too Many Requests")
 				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 			defer atomic.StoreUint32(&processing_lr, 0)
 		}
 		defer func() {
-			level.Debug(logger).Log("msg", "Request elapsed time", "sinceStart", time.Since(start), "query_collect", query_collect)
+			logger.Debug("Request elapsed time", "sinceStart", time.Since(start), "query_collect", query_collect)
 		}()
 
-		filteredScrapers := scrapers
-		params := r.URL.Query()["collect[]"]
 		// Use request context for cancellation when connection gets closed.
 		ctx := r.Context()
 		// If a timeout is configured via the Prometheus header, add it to the context.
-		if v := r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"); v != "" {
-			timeoutSeconds, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				level.Error(logger).Log("msg", "Failed to parse timeout from Prometheus header", "err", err)
-			} else {
-				if *timeoutOffset >= timeoutSeconds {
-					// Ignore timeout offset if it doesn't leave time to scrape.
-					level.Error(logger).Log("msg", "Timeout offset should be lower than prometheus scrape timeout", "offset", *timeoutOffset, "prometheus_scrape_timeout", timeoutSeconds)
-				} else {
-					// Subtract timeout offset from timeout.
-					timeoutSeconds -= *timeoutOffset
-				}
-				// Create new timeout context with request context as parent.
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds*float64(time.Second)))
-				defer cancel()
-				// Overwrite request with timeout context.
-				r = r.WithContext(ctx)
-			}
+		timeoutSeconds, err := getScrapeTimeoutSeconds(r, *timeoutOffset)
+		if err != nil {
+			logger.Error("Error getting timeout from Prometheus header", "err", err)
 		}
-		level.Debug(logger).Log("msg", "collect[] params", "params", strings.Join(params, ","))
-
-		// Check if we have some "collect[]" query parameters.
-		if len(params) > 0 {
-			filters := make(map[string]bool)
-			for _, param := range params {
-				filters[param] = true
-			}
-
-			filteredScrapers = nil
-			for _, scraper := range scrapers {
-				if filters[scraper.Name()] {
-					filteredScrapers = append(filteredScrapers, scraper)
-				}
-			}
+		if timeoutSeconds > 0 {
+			// Create new timeout context with request context as parent.
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds*float64(time.Second)))
+			defer cancel()
+			// Overwrite request with timeout context.
+			r = r.WithContext(ctx)
 		}
 
-		// Copy db as local variable, so the pointer passed to newHandler doesn't get updated.
-		db := db
-		// If there is no global connection pool then create new.
-		var err error
-		if db == nil {
-			db, err = newDB(dsn)
-			if err != nil {
-				level.Error(logger).Log("msg", "Error opening connection to database", "error", err)
-				return
-			}
-			defer db.Close()
+		collect := q["collect[]"]
+		logger.Debug("msg", "collect[] params", strings.Join(collect, ","))
+
+		filteredScrapers := filterScrapers(scrapers, collect)
+
+		var dsn string
+		target := ""
+		if q.Has("target") {
+			target = q.Get("target")
+		}
+
+		cfg := c.GetConfig()
+		cfgsection, ok := cfg.Sections["client"]
+		if !ok {
+			logger.Error("Failed to parse section [client] from config file", "err", err)
+		}
+		if dsn, err = cfgsection.FormDSN(target); err != nil {
+			logger.Error("Failed to form dsn from section [client]", "err", err)
 		}
 
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(collector.New(ctx, db, metrics, filteredScrapers, logger))
+		registry.MustRegister(collector.New(ctx, dsn, metrics, filteredScrapers, logger))
 
 		gatherers := prometheus.Gatherers{}
 		if defaultGatherer {
@@ -432,16 +446,14 @@ func newHandler(cfg *webAuth, db *sql.DB, metrics collector.Metrics, scrapers []
 		}
 		gatherers = append(gatherers, registry)
 
+		eLogger := &errLogger{logger: logger}
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
-			// mysqld_exporter has multiple collectors, if one fails,
-			// we still should report metrics from collectors that succeeded.
+			// mysqld_exporter has multiple collectors; if one fails,
+			// we still should handle metrics from collectors that succeeded.
 			ErrorHandling: promhttp.ContinueOnError,
-			//ErrorLog:      logger., TODO TS
+			ErrorLog:      eLogger,
 		})
-		if cfg.User != "" && cfg.Password != "" {
-			h = &basicAuthHandler{handler: h.ServeHTTP, user: cfg.User, password: cfg.Password}
-		}
 		h.ServeHTTP(w, r)
 	}
 }
@@ -464,48 +476,33 @@ func main() {
 	}
 
 	// Parse flags.
-	promlogConfig := &promlog.Config{}
-	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	promslogConfig := &promslog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 	kingpin.Version(version.Print("mysqld_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
-	logger := promlog.New(promlogConfig)
+	logger := promslog.New(promslogConfig)
 
-	// landingPage contains the HTML served at '/'.
-	// TODO: Make this nicer and more informative.
-	var landingPage = []byte(`<html>
-<head><title>MySQLd exporter</title></head>
-<body>
-<h1>MySQL 3-in-1 exporter</h1>
-<ul>
-	<li><a href="` + *metricPath + `-hr">high-res metrics</a></li>
-	<li><a href="` + *metricPath + `-mr">medium-res metrics</a></li>
-	<li><a href="` + *metricPath + `-lr">low-res metrics</a></li>
-</ul>
-<h1>MySQL exporter</h1>
-<ul>
-	<li><a href="` + *metricPath + `">all metrics</a></li>
-</ul>
-</body>
-</html>
-`)
+	// landingPage contains the ExtraHTML element part of the index page to be rendered at '/'.
+	var landingPage = []byte(`
+		<h2>MySQL metrics in different resolutions</h2>
+		<ul>
+			<li><a href="` + *metricsPath + `-hr">high-res metrics</a></li>
+			<li><a href="` + *metricsPath + `-mr">medium-res metrics</a></li>
+			<li><a href="` + *metricsPath + `-lr">low-res metrics</a></li>
+		</ul>`,
+	)
 
-	level.Info(logger).Log("msg", "Starting mysqld_exporter", "version", version.Info())
-	level.Info(logger).Log("msg", "Build context", version.BuildContext())
+	logger.Info("Starting mysqld_exporter", "version", version.Info())
+	logger.Info("Build context", "build_context", version.BuildContext())
 
-	dsn = os.Getenv("DATA_SOURCE_NAME")
+	dsn := os.Getenv("DATA_SOURCE_NAME")
 	if len(dsn) == 0 {
 		var err error
 		if dsn, err = parseMycnf(*configMycnf, logger); err != nil {
-			level.Error(logger).Log("msg", "Error parsing my.cnf", "file", *configMycnf, "err", err)
+			logger.Error("Error parsing my.cnf", "file", *configMycnf, "err", err)
 			os.Exit(1)
 		}
-	}
-
-	// Setup extra params for the DSN, default to having a lock timeout.
-	dsnParams := []string{fmt.Sprintf(timeoutParam, *exporterLockTimeout)}
-	if *exporterLogSlowFilter {
-		dsnParams = append(dsnParams, sessionSettingsParam)
 	}
 
 	// The parseMycnf function will set the TLS config in case certificates are being defined in
@@ -513,24 +510,15 @@ func main() {
 	// override the ones from the cnf file.
 	if *mysqlSSLCAFile != "" || (*mysqlSSLCertFile != "" && *mysqlSSLKeyFile != "") {
 		if err := customizeTLS(*mysqlSSLCAFile, *mysqlSSLCertFile, *mysqlSSLKeyFile); err != nil {
-			level.Error(logger).Log("msg", "failed to register a custom TLS configuration for mysql dsn", "error", err)
+			logger.Error("failed to register a custom TLS configuration for mysql dsn", "error", err)
 		}
 		var err error
 		dsn, err = setTLSConfig(dsn)
 		if err != nil {
-			level.Error(logger).Log("msg", "failed to register a custom TLS configuration for mysql dsn", "error", err)
+			logger.Error("failed to register a custom TLS configuration for mysql dsn", "error", err)
 			os.Exit(1)
 		}
 	}
-
-	// This could be improved using the driver's DSN parse and config format functions but this is
-	// how upstream does it.
-	if strings.Contains(dsn, "?") {
-		dsn += "&"
-	} else {
-		dsn += "?"
-	}
-	dsn += strings.Join(dsnParams, "&")
 
 	// Open global connection pool if requested.
 	var db *sql.DB
@@ -540,26 +528,10 @@ func main() {
 	if *exporterGlobalConnPool {
 		db, err = newDB(dsn)
 		if err != nil {
-			level.Error(logger).Log("msg", "Error opening connection to database", "error", err)
+			logger.Error("Error opening connection to database", "error", err)
 			return
 		}
 		defer db.Close()
-	}
-
-	cfg := &webAuth{}
-	httpAuth := os.Getenv("HTTP_AUTH")
-
-	if httpAuth != "" {
-		data := strings.SplitN(httpAuth, ":", 2)
-		if len(data) != 2 || data[0] == "" || data[1] == "" {
-			level.Error(logger).Log("msg", "HTTP_AUTH should be formatted as user:password")
-			return
-		}
-		cfg.User = data[0]
-		cfg.Password = data[1]
-	}
-	if cfg.User != "" && cfg.Password != "" {
-		level.Info(logger).Log("msg", "HTTP basic authentication is enabled")
 	}
 
 	// Use default mux for /debug/vars and /debug/pprof
@@ -569,78 +541,114 @@ func main() {
 	all, hr, mr, lr := enabledScrapers(scraperFlags)
 
 	// TODO: Remove later. It's here for backward compatibility. See: https://jira.percona.com/browse/PMM-2180.
-	mux.Handle(*metricPath+"-hr", newHandler(cfg, db, collector.NewMetrics("hr"), hr, true, logger))
-	mux.Handle(*metricPath+"-mr", newHandler(cfg, db, collector.NewMetrics("mr"), mr, false, logger))
-	mux.Handle(*metricPath+"-lr", newHandler(cfg, db, collector.NewMetrics("lr"), lr, false, logger))
+	mux.Handle(*metricsPath+"-hr", newHandler(collector.NewMetrics("hr"), hr, true, logger))
+	mux.Handle(*metricsPath+"-mr", newHandler(collector.NewMetrics("mr"), mr, false, logger))
+	mux.Handle(*metricsPath+"-lr", newHandler(collector.NewMetrics("lr"), lr, false, logger))
 
 	// Handle all metrics on one endpoint.
-	mux.Handle(*metricPath, newHandler(cfg, db, collector.NewMetrics(""), all, false, logger))
+	mux.Handle(*metricsPath, newHandler(collector.NewMetrics(""), all, false, logger))
 
 	// Log which scrapers are enabled.
 	if len(hr) > 0 {
-		level.Info(logger).Log("msg", "Enabled High Resolution scrapers:")
+		logger.Info("Enabled High Resolution scrapers:")
 		for _, scraper := range hr {
 			var v = fmt.Sprintf(" --collect.%s", scraper.Name())
-			level.Info(logger).Log("msg", v)
+			logger.Info(v)
 		}
 	}
 	if len(mr) > 0 {
-		level.Info(logger).Log("msg", "Enabled Medium Resolution scrapers:")
+		logger.Info("Enabled Medium Resolution scrapers:")
 		for _, scraper := range mr {
 			var v = fmt.Sprintf(" --collect.%s", scraper.Name())
-			level.Info(logger).Log("msg", v)
+			logger.Info(v)
 		}
 	}
 	if len(lr) > 0 {
-		level.Info(logger).Log("msg", "Enabled Low Resolution scrapers:")
+		logger.Info("Enabled Low Resolution scrapers:")
 		for _, scraper := range lr {
 			var v = fmt.Sprintf(" --collect.%s", scraper.Name())
-			level.Info(logger).Log("msg", v)
+			logger.Info(v)
 		}
 	}
 	if len(all) > 0 {
-		level.Info(logger).Log("msg", "Enabled Resolution Independent scrapers:")
+		logger.Info("Enabled Resolution Independent scrapers:")
 		for _, scraper := range all {
 			var v = fmt.Sprintf(" --collect.%s", scraper.Name())
-			level.Info(logger).Log("msg", v)
+			logger.Info(v)
 		}
 	}
 
 	srv := &http.Server{
-		Addr:    *listenAddress,
 		Handler: mux,
 	}
 
-	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
-
-	if *webConfigFile != "" && *webConfig != "" {
-		level.Error(logger).Log("msg", "Should specify only one web-config file")
+	// Need to check the web.config flag as well for backward compatibility.
+	if *toolkitFlags.WebConfigFile != "" && *webConfig != "" {
+		logger.Error("Should specify only one web-config file")
 		os.Exit(1)
 	}
 
-	webCfg := ""
-	if *webConfigFile != "" {
-		webCfg = *webConfigFile
-	}
-	if *webConfig != "" {
-		webCfg = *webConfig
+	// If web.config.file flag is not set, use the deprecated web.config flag.
+	if *toolkitFlags.WebConfigFile == "" && *webConfig != "" {
+		*toolkitFlags.WebConfigFile = *webConfig
+		*webConfig = ""
 	}
 
-	if webCfg != "" {
-		// https
-		mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
-			w.Write(landingPage)
-		})
+	// logger.Info("Starting mysqld_exporter", "version", version.Info())
+	// logger.Info("Build context", "build_context", version.BuildContext())
 
-		level.Error(logger).Log("error", web.ListenAndServe(srv, webCfg, logger))
-	} else {
-		// http
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write(landingPage)
-		})
+	if err = c.ReloadConfig(*configMycnf, *mysqldAddress, *mysqldUser, *tlsInsecureSkipVerify, logger); err != nil {
+		logger.Info("Error parsing host config", "file", *configMycnf, "err", err)
+		os.Exit(1)
+	}
 
-		level.Error(logger).Log("error", srv.ListenAndServe())
+	// Register only scrapers enabled by flag.
+	// enabledScrapers := []collector.Scraper{}
+	// for scraper, enabled := range scraperFlags {
+	// 	if *enabled {
+	// 		logger.Info("Scraper enabled", "scraper", scraper.Name())
+	// 		enabledScrapers = append(enabledScrapers, scraper)
+	// 	}
+	// }
+	// handlerFunc := newHandler(collector.NewMetrics(""), enabledScrapers, false, logger)
+	// http.Handle(*metricsPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handlerFunc))
+
+	if *metricsPath != "/" && *metricsPath != "" {
+		landingConfig := web.LandingConfig{
+			Name:        "MySQLd Exporter",
+			Description: "Prometheus Exporter for MySQL servers",
+			Version:     version.Info(),
+			Links: []web.LandingLinks{
+				{
+					Address: *metricsPath,
+					Text:    "Metrics",
+				},
+			},
+			ExtraHTML: string(landingPage),
+		}
+		landingPage, err := web.NewLandingPage(landingConfig)
+		if err != nil {
+			logger.Error("Error creating landing page", "err", err)
+			os.Exit(1)
+		}
+		mux.Handle("/", landingPage)
+	}
+
+	// mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// 	w.Write(landingPage)
+	// })
+	mux.HandleFunc("/probe", handleProbe(all, logger))
+	mux.HandleFunc("/-/reload", func(w http.ResponseWriter, r *http.Request) {
+		if err = c.ReloadConfig(*configMycnf, *mysqldAddress, *mysqldUser, *tlsInsecureSkipVerify, logger); err != nil {
+			logger.Warn("Error reloading host config", "file", *configMycnf, "error", err)
+			return
+		}
+		_, _ = w.Write([]byte(`ok`))
+	})
+
+	if err := web.ListenAndServe(srv, toolkitFlags, logger); err != nil {
+		logger.Error("Error starting HTTP server", "err", err)
+		os.Exit(1)
 	}
 }
 

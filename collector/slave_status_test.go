@@ -18,9 +18,9 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/promslog"
 	"github.com/smartystreets/goconvey/convey"
 )
 
@@ -30,6 +30,7 @@ func TestScrapeSlaveStatus(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
+	inst := &Instance{db: db}
 
 	columns := []string{"Master_Host", "Read_Master_Log_Pos", "Slave_IO_Running", "Slave_SQL_Running", "Seconds_Behind_Master"}
 	rows := sqlmock.NewRows(columns).
@@ -38,7 +39,7 @@ func TestScrapeSlaveStatus(t *testing.T) {
 
 	ch := make(chan prometheus.Metric)
 	go func() {
-		if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
+		if err = (ScrapeSlaveStatus{}).Scrape(context.Background(), inst, ch, promslog.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)

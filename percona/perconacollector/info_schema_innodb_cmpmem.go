@@ -17,9 +17,8 @@ package perconacollector
 
 import (
 	"context"
-	"database/sql"
+	"log/slog"
 
-	"github.com/go-kit/log"
 	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -73,7 +72,8 @@ func (ScrapeInnodbCmpMem) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeInnodbCmpMem) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeInnodbCmpMem) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.GetDB()
 	informationSchemaInnodbCmpMemRows, err := db.QueryContext(ctx, innodbCmpMemQuery)
 	if err != nil {
 		return err

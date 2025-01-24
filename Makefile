@@ -20,7 +20,7 @@ PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= mysqld-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
-TMPDIR              ?= $(shell dirname $(shell mktemp)/)
+TMPDIR              ?= $(shell dirname $(shell mktemp -d)/)
 
 default: help
 

@@ -17,12 +17,10 @@ package perconacollector
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -90,10 +88,11 @@ func (ScrapeInnodbCmp) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeInnodbCmp) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeInnodbCmp) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.GetDB()
 	informationSchemaInnodbCmpRows, err := db.QueryContext(ctx, innodbCmpQuery)
 	if err != nil {
-		level.Debug(logger).Log("msg", "INNODB_CMP stats are not available.", "error", err)
+		logger.Debug("msg", "INNODB_CMP stats are not available.", err)
 		return err
 	}
 	defer informationSchemaInnodbCmpRows.Close()
@@ -104,7 +103,7 @@ func (ScrapeInnodbCmp) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometh
 	// To map metrics to names therefore we always range over columnNames[1:]
 	columnNames, err := informationSchemaInnodbCmpRows.Columns()
 	if err != nil {
-		level.Debug(logger).Log("msg", "INNODB_CMP stats are not available.", "error", err)
+		logger.Debug("msg", "INNODB_CMP stats are not available.", err)
 		return err
 	}
 

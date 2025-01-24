@@ -18,10 +18,10 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"github.com/go-kit/log"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/promslog"
 	"github.com/smartystreets/goconvey/convey"
 )
 
@@ -67,14 +67,17 @@ func TestScrapeTableSchema(t *testing.T) { //nolint:unused
 	addRowAndCheckRowsCount(t, ctx, db, dbName, tableName, 2)
 }
 
-func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbName, tableName string, expectedRowsCount float64) { //nolint:go-lint
+func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbName, tableName string, expectedRowsCount float64) {
 	_, err := db.Exec("INSERT INTO " + dbName + "." + tableName + " VALUES(50)")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ch := make(chan prometheus.Metric)
 	go func() { //nolint:wsl
-		if err = (ScrapeTableSchema{}).Scrape(ctx, db, ch, log.NewNopLogger()); err != nil {
+		instance := &Instance{
+			db: db,
+		}
+		if err = (ScrapeTableSchema{}).Scrape(ctx, instance, ch, promslog.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)
