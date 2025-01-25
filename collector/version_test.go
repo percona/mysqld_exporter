@@ -43,7 +43,7 @@ func TestGetMySQLVersion_Percona(t *testing.T) {
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("something"))
 		_, version, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, "")
+		convey.So(version, convey.ShouldEqual, "something")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("10.1.17-MariaDB"))
 		_, version, err = queryVersion(db)
