@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/blang/semver/v4"
 
 	"github.com/smartystreets/goconvey/convey"
 )
@@ -33,37 +34,37 @@ func TestGetMySQLVersion_Percona(t *testing.T) {
 	defer db.Close()
 
 	convey.Convey("MySQL version extract", t, func() {
-		var version string
+		var semVer semver.Version
 		var err error
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(""))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeError(err)
-		convey.So(version, convey.ShouldEqual, "")
+		convey.So(semVer.String(), convey.ShouldEqual, "0.0.0")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("something"))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, "something")
+		convey.So(semVer.String(), convey.ShouldEqual, "0.0.0")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("10.1.17-MariaDB"))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, 10.1)
+		convey.So(semVer.String(), convey.ShouldEqual, "10.1.17")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.7.13-6-log"))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, 5.7)
+		convey.So(semVer.String(), convey.ShouldEqual, "5.7.13")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.6.30-76.3-56-log"))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, 5.6)
+		convey.So(semVer.String(), convey.ShouldEqual, "5.6.30")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.5.51-38.1"))
-		_, version, err = queryVersion(db)
+		semVer, _, err = queryVersion(db)
 		convey.ShouldBeNil(err)
-		convey.So(version, convey.ShouldEqual, 5.5)
+		convey.So(semVer.String(), convey.ShouldEqual, "5.5.51")
 	})
 
 	// Ensure all SQL queries were executed
