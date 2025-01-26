@@ -26,6 +26,10 @@ default: help
 
 all: format build test-short
 
+init:             ## Install tools
+	rm -rf bin/*
+	cd tools && go generate -x -tags=tools
+
 env-up:           ## Start MySQL and copy ssl certificates to /tmp
 	@docker-compose up -d
 	@sleep 5
@@ -49,37 +53,32 @@ test:             ## Run all tests
 	@echo ">> running tests"
 	@$(GO) test -race $(pkgs)
 
+FILES = $(shell find . -type f -name '*.go')
+
 format:           ## Format the code
 	@echo ">> formatting code"
 	@$(GO) fmt $(pkgs)
+	@bin/goimports -local github.com/percona/pmm -l -w $(FILES)	
 
-FILES = $(shell find . -type f -name '*.go')
-
-fumpt:            ## Format source code using fumpt and fumports.
-	@gofumpt -w -s $(FILES)
-	@gofumports -local github.com/percona/mysqld_exporter -l -w $(FILES)
+fumpt:            ## Format source code using fumpt and goimports.
+	bin/gofumpt -l -w $(FILES)
+	bin/goimports -local github.com/percona/pmm -l -w $(FILES)	
 
 vet:              ## Run vet
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-build: promu      ## Build binaries
+build:            ## Build binaries
 	@echo ">> building binaries"
 	@$(PROMU) build --prefix $(PREFIX)
 
-tarball: promu    ## Build release tarball
+tarball:          ## Build release tarball
 	@echo ">> building release tarball"
 	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
 
 docker:           ## Build docker image
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
-
-promu:            ## Install promu
-	@GOOS=$(shell uname -s | tr A-Z a-z) \
-		GO111MODULE=on \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
-		$(GO) build -modfile=tools/go.mod -o bin/promu github.com/prometheus/promu
 
 help:             ## Display this help message.
 	@echo "$(TMPDIR)"
@@ -94,4 +93,4 @@ export PMM_RELEASE_PATH?=.
 release:
 	go build -ldflags="$(GO_BUILD_LDFLAGS)" -o $(PMM_RELEASE_PATH)/mysqld_exporter
 
-.PHONY: all style format build test vet tarball docker promu env-up env-down help default
+.PHONY: all init style format build test vet tarball docker env-up env-down help default
