@@ -17,13 +17,12 @@ package collector
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/log"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const (
@@ -47,7 +46,7 @@ const (
 		SELECT
 		    SCHEMA_NAME
 		  FROM information_schema.schemata
-		  WHERE SCHEMA_NAME NOT IN ('mysql', 'performance_schema', 'information_schema')
+		  WHERE SCHEMA_NAME NOT IN ('mysql', 'performance_schema', 'information_schema', 'sys')
 		`
 )
 
@@ -97,28 +96,18 @@ func (ScrapeTableSchema) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) (e error) {
-	// PMM-5684 fix
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { //nolint:wsl
-		err := conn.Close()
-		if err != nil && e == nil {
-			e = err
-		}
-	}()
+func (ScrapeTableSchema) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	var dbList []string
+	db := instance.GetDB()
 
 	// This query will affect only 8.0 and higher versions of MySQL, othervise it will be ignored
-	_, err = conn.ExecContext(ctx, "/*!80000 set session information_schema_stats_expiry=0 */")
+	_, err := db.ExecContext(ctx, "/*!80000 set session information_schema_stats_expiry=0 */")
 	if err != nil {
 		return err
 	}
 
-	var dbList []string
 	if *tableSchemaDatabases == "*" {
-		dbListRows, err := conn.QueryContext(ctx, dbListQuery)
+		dbListRows, err := db.QueryContext(ctx, dbListQuery)
 		if err != nil {
 			return err
 		}
@@ -139,7 +128,7 @@ func (ScrapeTableSchema) Scrape(ctx context.Context, db *sql.DB, ch chan<- prome
 	}
 
 	for _, database := range dbList {
-		tableSchemaRows, err := conn.QueryContext(ctx, fmt.Sprintf(tableSchemaQuery, database))
+		tableSchemaRows, err := db.QueryContext(ctx, fmt.Sprintf(tableSchemaQuery, database))
 		if err != nil {
 			return err
 		}

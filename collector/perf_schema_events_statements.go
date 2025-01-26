@@ -17,12 +17,11 @@ package collector
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/log"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const perfEventsStatementsQuery = `
@@ -32,6 +31,8 @@ const perfEventsStatementsQuery = `
 	    LEFT(DIGEST_TEXT, %d) as DIGEST_TEXT,
 	    COUNT_STAR,
 	    SUM_TIMER_WAIT,
+	    SUM_LOCK_TIME,
+	    SUM_CPU_TIME,
 	    SUM_ERRORS,
 	    SUM_WARNINGS,
 	    SUM_ROWS_AFFECTED,
@@ -41,7 +42,10 @@ const perfEventsStatementsQuery = `
 	    SUM_CREATED_TMP_TABLES,
 	    SUM_SORT_MERGE_PASSES,
 	    SUM_SORT_ROWS,
-	    SUM_NO_INDEX_USED
+	    SUM_NO_INDEX_USED,
+	    QUANTILE_95,
+	    QUANTILE_99,
+	    QUANTILE_999
 	  FROM (
 	    SELECT *
 	    FROM performance_schema.events_statements_summary_by_digest
@@ -55,6 +59,8 @@ const perfEventsStatementsQuery = `
 	    Q.DIGEST_TEXT,
 	    Q.COUNT_STAR,
 	    Q.SUM_TIMER_WAIT,
+	    Q.SUM_LOCK_TIME,
+	    Q.SUM_CPU_TIME,
 	    Q.SUM_ERRORS,
 	    Q.SUM_WARNINGS,
 	    Q.SUM_ROWS_AFFECTED,
@@ -64,7 +70,10 @@ const perfEventsStatementsQuery = `
 	    Q.SUM_CREATED_TMP_TABLES,
 	    Q.SUM_SORT_MERGE_PASSES,
 	    Q.SUM_SORT_ROWS,
-	    Q.SUM_NO_INDEX_USED
+	    Q.SUM_NO_INDEX_USED,
+	    Q.QUANTILE_95,
+	    Q.QUANTILE_99,
+	    Q.QUANTILE_999
 	  ORDER BY SUM_TIMER_WAIT DESC
 	  LIMIT %d
 	`
@@ -95,6 +104,16 @@ var (
 	performanceSchemaEventsStatementsTimeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, performanceSchema, "events_statements_seconds_total"),
 		"The total time of events statements by digest.",
+		[]string{"schema", "digest", "digest_text"}, nil,
+	)
+	performanceSchemaEventsStatementsLockTimeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, performanceSchema, "events_statements_lock_time_seconds_total"),
+		"The total lock time of events statements by digest.",
+		[]string{"schema", "digest", "digest_text"}, nil,
+	)
+	performanceSchemaEventsStatementsCpuTimeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, performanceSchema, "events_statements_cpu_time_seconds_total"),
+		"The total cpu time of events statements by digest.",
 		[]string{"schema", "digest", "digest_text"}, nil,
 	)
 	performanceSchemaEventsStatementsErrorsDesc = prometheus.NewDesc(
@@ -147,6 +166,11 @@ var (
 		"The total number of statements that used full table scans by digest.",
 		[]string{"schema", "digest", "digest_text"}, nil,
 	)
+	performanceSchemaEventsStatementsLatency = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, performanceSchema, "events_statements_latency"),
+		"A summary of statement latency by digest",
+		[]string{"schema", "digest", "digest_text"}, nil,
+	)
 )
 
 // ScrapePerfEventsStatements collects from `performance_schema.events_statements_summary_by_digest`.
@@ -168,13 +192,14 @@ func (ScrapePerfEventsStatements) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapePerfEventsStatements) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapePerfEventsStatements) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	perfQuery := fmt.Sprintf(
 		perfEventsStatementsQuery,
 		*perfEventsStatementsDigestTextLimit,
 		*perfEventsStatementsTimeLimit,
 		*perfEventsStatementsLimit,
 	)
+	db := instance.GetDB()
 	// Timers here are returned in picoseconds.
 	perfSchemaEventsStatementsRows, err := db.QueryContext(ctx, perfQuery)
 	if err != nil {
@@ -184,15 +209,17 @@ func (ScrapePerfEventsStatements) Scrape(ctx context.Context, db *sql.DB, ch cha
 
 	var (
 		schemaName, digest, digestText       string
-		count, queryTime, errors, warnings   uint64
+		count, queryTime, lockTime, cpuTime  uint64
+		errors, warnings                     uint64
 		rowsAffected, rowsSent, rowsExamined uint64
 		tmpTables, tmpDiskTables             uint64
 		sortMergePasses, sortRows            uint64
 		noIndexUsed                          uint64
+		quantile95, quantile99, quantile999  uint64
 	)
 	for perfSchemaEventsStatementsRows.Next() {
 		if err := perfSchemaEventsStatementsRows.Scan(
-			&schemaName, &digest, &digestText, &count, &queryTime, &errors, &warnings, &rowsAffected, &rowsSent, &rowsExamined, &tmpTables, &tmpDiskTables, &sortMergePasses, &sortRows, &noIndexUsed,
+			&schemaName, &digest, &digestText, &count, &queryTime, &lockTime, &cpuTime, &errors, &warnings, &rowsAffected, &rowsSent, &rowsExamined, &tmpDiskTables, &tmpTables, &sortMergePasses, &sortRows, &noIndexUsed, &quantile95, &quantile99, &quantile999,
 		); err != nil {
 			return err
 		}
@@ -202,6 +229,14 @@ func (ScrapePerfEventsStatements) Scrape(ctx context.Context, db *sql.DB, ch cha
 		)
 		ch <- prometheus.MustNewConstMetric(
 			performanceSchemaEventsStatementsTimeDesc, prometheus.CounterValue, float64(queryTime)/picoSeconds,
+			schemaName, digest, digestText,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			performanceSchemaEventsStatementsLockTimeDesc, prometheus.CounterValue, float64(lockTime)/picoSeconds,
+			schemaName, digest, digestText,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			performanceSchemaEventsStatementsCpuTimeDesc, prometheus.CounterValue, float64(cpuTime)/picoSeconds,
 			schemaName, digest, digestText,
 		)
 		ch <- prometheus.MustNewConstMetric(
@@ -244,6 +279,11 @@ func (ScrapePerfEventsStatements) Scrape(ctx context.Context, db *sql.DB, ch cha
 			performanceSchemaEventsStatementsNoIndexUsedDesc, prometheus.CounterValue, float64(noIndexUsed),
 			schemaName, digest, digestText,
 		)
+		ch <- prometheus.MustNewConstSummary(performanceSchemaEventsStatementsLatency, count, float64(queryTime)/picoSeconds, map[float64]float64{
+			95:  float64(quantile95) / picoSeconds,
+			99:  float64(quantile99) / picoSeconds,
+			999: float64(quantile999) / picoSeconds,
+		}, schemaName, digest, digestText)
 	}
 	return nil
 }

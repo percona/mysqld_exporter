@@ -16,18 +16,18 @@ package perconacollector
 import (
 	"context"
 	"fmt"
-	"github.com/go-kit/log"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/alecthomas/kingpin/v2"
+	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/promslog"
 	"github.com/smartystreets/goconvey/convey"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const customQueryCounter = `
@@ -108,7 +108,9 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 
 		ch := make(chan prometheus.Metric)
 		go func() {
-			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
+			instance := &cl.Instance{}
+			instance.SetDB(db)
+			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
 			close(ch)
@@ -171,7 +173,9 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 
 		ch := make(chan prometheus.Metric)
 		go func() {
-			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
+			instance := &cl.Instance{}
+			instance.SetDB(db)
+			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
 			close(ch)
@@ -231,7 +235,9 @@ func TestScrapeCustomQueriesDbError(t *testing.T) {
 
 		expectedErr := "experiment_garden:error running query on database: experiment_garden, ERROR 1049 (42000): Unknown database 'non_existed_experiment'"
 		convey.Convey("Should raise error ", func() {
-			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, log.NewNopLogger())
+			instance := &cl.Instance{}
+			instance.SetDB(db)
+			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, expectedErr)
 		})
 		close(ch)
@@ -259,7 +265,9 @@ func TestScrapeCustomQueriesIncorrectYaml(t *testing.T) {
 		ch := make(chan prometheus.Metric)
 
 		convey.Convey("Should raise error ", func() {
-			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, log.NewNopLogger())
+			instance := &cl.Instance{}
+			instance.SetDB(db)
+			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, "failed to add custom queries:incorrect yaml format for bar")
 		})
 		close(ch)
@@ -275,7 +283,9 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 			t.Fatalf("error opening a stub database connection: %s", err)
 		}
 		ch := make(chan prometheus.Metric)
-		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), db, ch, log.NewNopLogger())
+		instance := &cl.Instance{}
+		instance.SetDB(db)
+		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 		close(ch)
 		convey.So(err, convey.ShouldBeError, "failed read dir \"/wrong/path\" for custom query. reason: open /wrong/path: no such file or directory")
 	})
@@ -288,7 +298,7 @@ func createTmpFile(t *testing.T, resolution, content string) string {
 	if err != nil {
 		t.Fatalf("Cannot create temporary directory: %s", err)
 	}
-	tmpFile, err := ioutil.TempFile(tempDir, "custom_queries.*.yaml")
+	tmpFile, err := os.CreateTemp(tempDir, "custom_queries.*.yaml")
 	if err != nil {
 		t.Fatalf("Cannot create temporary file: %s", err)
 	}

@@ -3,8 +3,8 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -46,7 +46,8 @@ func (ScrapePlugins) Version() float64 {
 	return 5.1
 }
 
-func (ScrapePlugins) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapePlugins) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.GetDB()
 	showPluginsRows, err := db.QueryContext(ctx, pluginsQuery)
 	if err != nil {
 		return err

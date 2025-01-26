@@ -1,4 +1,5 @@
 /.build
+/bin
 /mysqld_exporter
 /.release
 /.tarballs

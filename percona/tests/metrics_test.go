@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 var dumpMetricsFlag = flag.Bool("dumpMetrics", false, "")
@@ -523,17 +521,17 @@ func getMetrics(fileName string) (string, error) {
 func getMetricsFrom(fileName, endpoint string) (string, error) {
 	cmd, port, collectOutput, err := launchExporter(fileName)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to launch exporter")
+		return "", fmt.Errorf("Failed to launch exporter: %w", err)
 	}
 
 	metrics, err := tryGetMetricsFrom(port, endpoint)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to get metrics")
+		return "", fmt.Errorf("Failed to get metrics: %w", err)
 	}
 
 	err = stopExporter(cmd, collectOutput)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to stop exporter")
+		return "", fmt.Errorf("Failed to stop exporter: %w", err)
 	}
 
 	return metrics, nil

@@ -15,9 +15,8 @@ package perconacollector
 
 import (
 	"context"
-	"database/sql"
+	"log/slog"
 
-	"github.com/go-kit/log"
 	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -49,7 +48,7 @@ func (standardGo) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardGo) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (s standardGo) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }
@@ -80,7 +79,7 @@ func (standardProcess) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardProcess) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (s standardProcess) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }

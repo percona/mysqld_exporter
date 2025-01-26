@@ -18,11 +18,11 @@ package perconacollector
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
 	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -100,7 +100,8 @@ func (ScrapeGlobalStatus) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeGlobalStatus) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.GetDB()
 	globalStatusRows, err := db.QueryContext(ctx, globalStatusQuery)
 	if err != nil {
 		return err
@@ -146,9 +147,13 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 				)
 			case "innodb_buffer_pool_pages":
 				switch match[2] {
-				case "data", "dirty", "free", "misc", "old", "total":
+				case "data", "free", "misc", "old", "total":
 					ch <- prometheus.MustNewConstMetric(
 						globalBufferPoolPagesDesc, prometheus.GaugeValue, floatVal, match[2],
+					)
+				case "dirty":
+					ch <- prometheus.MustNewConstMetric(
+						globalBufferPoolDirtyPagesDesc, prometheus.GaugeValue, floatVal, match[2],
 					)
 				default:
 					ch <- prometheus.MustNewConstMetric(
@@ -189,11 +194,11 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 		}
 
 		evsMap := []evsValue{
-			evsValue{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
-			evsValue{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
-			evsValue{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
-			evsValue{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
-			evsValue{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
+			{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
+			{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
+			{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
+			{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
+			{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
 		}
 
 		evsParsingSuccess := true
