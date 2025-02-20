@@ -29,126 +29,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartystreets/goconvey/convey"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/percona/mysqld_exporter/collector"
-	"github.com/prometheus/common/promslog"
 )
-
-func TestParseMycnf(t *testing.T) {
-	const (
-		tcpConfig = `
-			[client]
-			user = root
-			password = abc123
-		`
-		tcpConfig2 = `
-			[client]
-			user = root
-			password = abc123
-			port = 3308
-		`
-		clientAuthConfig = `
-			[client]
-			user = root
-			port = 3308
-			ssl-ca = ca.crt
- 			ssl-cert = tls.crt
- 			ssl-key = tls.key
-		`
-		socketConfig = `
-			[client]
-			user = user
-			password = pass
-			socket = /var/lib/mysql/mysql.sock
-		`
-		socketConfig2 = `
-			[client]
-			user = dude
-			password = nopassword
-			# host and port will not be used because of socket presence
-			host = 1.2.3.4
-			port = 3307
-			socket = /var/lib/mysql/mysql.sock
-		`
-		remoteConfig = `
-			[client]
-			user = dude
-			password = nopassword
-			host = 1.2.3.4
-			port = 3307
-		`
-		ignoreBooleanKeys = `
-			[client]
-			user = root
-			password = abc123
-
-			[mysql]
-			skip-auto-rehash
-		`
-		badConfig = `
-			[client]
-			user = root
-		`
-		badConfig2 = `
-			[client]
-			password = abc123
-			socket = /var/lib/mysql/mysql.sock
-		`
-		badConfig3 = `
-			[hello]
-			world = ismine
-		`
-		badConfig4 = `[hello`
-	)
-	convey.Convey("Various .my.cnf configurations", t, func() {
-		convey.Convey("Local tcp connection", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
-		})
-		convey.Convey("Local tcp connection on non-default port", func() {
-			dsn, _ := parseMycnf([]byte(tcpConfig2), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3308)/")
-		})
-		convey.Convey("Authentication with client certificate and no password", func() {
-			dsn, _ := parseMycnf([]byte(clientAuthConfig), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "root@tcp(localhost:3308)/")
-		})
-		convey.Convey("Socket connection", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "user:pass@unix(/var/lib/mysql/mysql.sock)/")
-		})
-		convey.Convey("Socket connection ignoring defined host", func() {
-			dsn, _ := parseMycnf([]byte(socketConfig2), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@unix(/var/lib/mysql/mysql.sock)/")
-		})
-		convey.Convey("Remote connection", func() {
-			dsn, _ := parseMycnf([]byte(remoteConfig), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "dude:nopassword@tcp(1.2.3.4:3307)/")
-		})
-		convey.Convey("Ignore boolean keys", func() {
-			dsn, _ := parseMycnf([]byte(ignoreBooleanKeys), promslog.NewNopLogger())
-			convey.So(dsn, convey.ShouldEqual, "root:abc123@tcp(localhost:3306)/")
-		})
-		convey.Convey("Missed user", func() {
-			_, err := parseMycnf([]byte(badConfig), promslog.NewNopLogger())
-			convey.So(err, convey.ShouldBeError, fmt.Errorf("password or ssl-key should be specified under [client] in %s", badConfig))
-		})
-		convey.Convey("Missed password", func() {
-			_, err := parseMycnf([]byte(badConfig2), promslog.NewNopLogger())
-			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig2))
-		})
-		convey.Convey("No [client] section", func() {
-			_, err := parseMycnf([]byte(badConfig3), promslog.NewNopLogger())
-			convey.So(err, convey.ShouldBeError, fmt.Errorf("no user specified under [client] in %s", badConfig3))
-		})
-		convey.Convey("Invalid config", func() {
-			_, err := parseMycnf([]byte(badConfig4), promslog.NewNopLogger())
-			convey.So(err, convey.ShouldBeError, fmt.Errorf("failed reading ini file: unclosed section: %s", badConfig4))
-		})
-	})
-}
 
 // bin stores information about path of executable and attached port
 type bin struct {
@@ -247,7 +130,7 @@ func testLanding(t *testing.T, data bin) {
 	got := string(body)
 
 	expected := `
-<h2>MySQL metrics in different resolutions</h2>
+<h2>Prometheus Exporter for MySQL servers</h2>
 `
 	if !strings.Contains(got, expected) {
 		t.Fatalf("the web page does not contain expected content: \n%s", cmp.Diff(got, expected))

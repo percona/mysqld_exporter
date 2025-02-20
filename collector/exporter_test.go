@@ -15,7 +15,6 @@ package collector
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,16 +30,9 @@ func TestExporter(t *testing.T) {
 		t.Skip("-short is passed, skipping test")
 	}
 
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
 	exporter := New(
 		context.Background(),
 		dsn,
-		NewMetrics(""),
 		[]Scraper{
 			ScrapeGlobalStatus{},
 		},
@@ -80,10 +72,6 @@ func TestGetMySQLVersion(t *testing.T) {
 	}
 
 	convey.Convey("Version parsing", t, func() {
-		db, err := sql.Open("mysql", dsn)
-		convey.So(err, convey.ShouldBeNil)
-		defer db.Close()
-
 		instance, err := newInstance(dsn)
 		convey.So(err, convey.ShouldBeNil)
 

@@ -4,7 +4,7 @@
 /.release
 /.tarballs
 
-*.tar.gz
+*.tar.{gz,xz}
 *.test
 *-stamp
 .idea

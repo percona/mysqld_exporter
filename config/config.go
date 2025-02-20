@@ -238,7 +238,7 @@ func (m MySqlConfig) CustomizeTLS() error {
 	if ok := caBundle.AppendCertsFromPEM(pemCA); ok {
 		tlsCfg.RootCAs = caBundle
 	} else {
-		return fmt.Errorf("failed parse pem-encoded CA certificates from %s", m.SslCa)
+		return fmt.Errorf("failed parsing pem-encoded CA certificates from %s", m.SslCa)
 	}
 	if m.SslCert != "" && m.SslKey != "" {
 		certPairs := make([]tls.Certificate, 0, 1)

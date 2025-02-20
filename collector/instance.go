@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/blang/semver/v4"
 )
 
@@ -27,6 +28,21 @@ const (
 	FlavorMySQL   = "mysql"
 	FlavorMariaDB = "mariadb"
 	versionQuery  = "SELECT @@version;"
+)
+
+var (
+	exporterMaxOpenConns = kingpin.Flag(
+		"exporter.max-open-conns",
+		"Maximum number of open connections to the database. https://golang.org/pkg/database/sql/#DB.SetMaxOpenConns",
+	).Default("3").Int()
+	exporterMaxIdleConns = kingpin.Flag(
+		"exporter.max-idle-conns",
+		"Maximum number of connections in the idle connection pool. https://golang.org/pkg/database/sql/#DB.SetMaxIdleConns",
+	).Default("3").Int()
+	exporterConnMaxLifetime = kingpin.Flag(
+		"exporter.conn-max-lifetime",
+		"Maximum amount of time a connection may be reused. https://golang.org/pkg/database/sql/#DB.SetConnMaxLifetime",
+	).Default("1m").Duration()
 )
 
 type Instance struct {
@@ -42,8 +58,10 @@ func newInstance(dsn string) (*Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(*exporterMaxOpenConns)
+	db.SetMaxIdleConns(*exporterMaxIdleConns)
+	db.SetConnMaxLifetime(*exporterConnMaxLifetime)
+
 	i.db = db
 
 	version, versionString, err := queryVersion(db)
@@ -81,6 +99,7 @@ func (i *Instance) SetDB(db *sql.DB) {
 	i.db = db
 }
 
+// Close closes the database connection.
 func (i *Instance) Close() error {
 	return i.db.Close()
 }

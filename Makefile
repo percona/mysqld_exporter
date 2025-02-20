@@ -86,11 +86,17 @@ help:             ## Display this help message.
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | \
         awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
-GO_BUILD_LDFLAGS = -X github.com/prometheus/common/version.Version=$(shell cat VERSION) -X github.com/prometheus/common/version.Revision=$(shell git rev-parse HEAD) -X github.com/prometheus/common/version.Branch=$(shell git describe --always --contains --all) -X github.com/prometheus/common/version.BuildUser= -X github.com/prometheus/common/version.BuildDate=$(shell date +%FT%T%z) -s -w
+GO_BUILD_LDFLAGS = -ldflags " \
+		-X github.com/prometheus/common/version.Version=$(shell cat VERSION) \
+		-X github.com/prometheus/common/version.Revision=$(shell git rev-parse HEAD) \
+		-X github.com/prometheus/common/version.Branch=$(shell git describe --always --contains --all) \
+		-X github.com/prometheus/common/version.BuildUser= \
+		-X github.com/prometheus/common/version.BuildDate=$(shell date +%FT%T%z) -s -w \
+	"
 
 export PMM_RELEASE_PATH?=.
 
 release:
-	go build -ldflags="$(GO_BUILD_LDFLAGS)" -o $(PMM_RELEASE_PATH)/mysqld_exporter
+	go build $(GO_BUILD_LDFLAGS) -o $(PMM_RELEASE_PATH)/mysqld_exporter
 
 .PHONY: all init style format build test vet tarball docker env-up env-down help default

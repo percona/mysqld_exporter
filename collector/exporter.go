@@ -47,7 +47,7 @@ var (
 		"exporter.lock_wait_timeout",
 		"Set a lock_wait_timeout (in seconds) on the connection to avoid long metadata locking.",
 	).Default("2").Int()
-	exporterLogSlowFilter = kingpin.Flag(
+	slowLogFilter = kingpin.Flag(
 		"exporter.log_slow_filter",
 		"Add a log_slow_filter to avoid slow query logging of scrapes. NOTE: Not supported by Oracle MySQL.",
 	).Default("false").Bool()
@@ -83,16 +83,15 @@ type Exporter struct {
 	logger   *slog.Logger
 	dsn      string
 	scrapers []Scraper
-	metrics  Metrics
 	instance *Instance
 }
 
 // New returns a new MySQL exporter for the provided DSN.
-func New(ctx context.Context, dsn string, metrics Metrics, scrapers []Scraper, logger *slog.Logger) *Exporter {
+func New(ctx context.Context, dsn string, scrapers []Scraper, logger *slog.Logger) *Exporter {
 	// Setup extra params for the DSN, default to having a lock timeout.
 	dsnParams := []string{fmt.Sprintf(timeoutParam, *exporterLockTimeout)}
 
-	if *exporterLogSlowFilter {
+	if *slowLogFilter {
 		dsnParams = append(dsnParams, sessionSettingsParam)
 	}
 
@@ -108,7 +107,6 @@ func New(ctx context.Context, dsn string, metrics Metrics, scrapers []Scraper, l
 		logger:   logger,
 		dsn:      dsn,
 		scrapers: scrapers,
-		metrics:  metrics,
 	}
 }
 
@@ -173,47 +171,6 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) floa
 		}(scraper)
 	}
 	return 1.0
-}
-
-// Metrics represents exporter metrics which values can be carried between http requests.
-type Metrics struct {
-	TotalScrapes prometheus.Counter
-	ScrapeErrors *prometheus.CounterVec
-	Error        prometheus.Gauge
-	MySQLUp      prometheus.Gauge
-}
-
-// NewMetrics creates new Metrics instance.
-func NewMetrics(resolution string) Metrics {
-	subsystem := exporter
-	if resolution != "" {
-		subsystem = exporter + "_" + resolution
-	}
-	return Metrics{
-		TotalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "scrapes_total",
-			Help:      "Total number of times MySQL was scraped for metrics.",
-		}),
-		ScrapeErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "scrape_errors_total",
-			Help:      "Total number of times an error occurred scraping a MySQL.",
-		}, []string{"collector"}),
-		Error: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "last_scrape_error",
-			Help:      "Whether the last scrape of metrics from MySQL resulted in an error (1 for error, 0 for success).",
-		}),
-		MySQLUp: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "up",
-			Help:      "Whether the MySQL server is up.",
-		}),
-	}
 }
 
 func (e *Exporter) getTargetFromDsn() string {
