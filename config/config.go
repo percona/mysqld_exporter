@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -42,6 +43,21 @@ var (
 		Name:      "config_last_reload_success_timestamp_seconds",
 		Help:      "Timestamp of the last successful configuration reload.",
 	})
+
+	mysqlSSLCAFile = kingpin.Flag(
+		"mysql.ssl-ca-file",
+		"SSL CA file for the MySQL connection",
+	).ExistingFile()
+
+	mysqlSSLCertFile = kingpin.Flag(
+		"mysql.ssl-cert-file",
+		"SSL Cert file for the MySQL connection",
+	).ExistingFile()
+
+	mysqlSSLKeyFile = kingpin.Flag(
+		"mysql.ssl-key-file",
+		"SSL Key file for the MySQL connection",
+	).ExistingFile()
 
 	opts = ini.LoadOptions{
 		// Do not error on nonexistent file to allow empty string as filename input
@@ -151,6 +167,15 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 			mysqlcfg.User = user
 			mysqlcfg.Password = password
 		}
+		if mysqlSSLCAFile != nil {
+			mysqlcfg.SslCa = *mysqlSSLCAFile
+		}
+		if mysqlSSLCertFile != nil {
+			mysqlcfg.SslCert = *mysqlSSLCertFile
+		}
+		if mysqlSSLKeyFile != nil {
+			mysqlcfg.SslKey = *mysqlSSLKeyFile
+		}
 
 		err = sec.StrictMapTo(mysqlcfg)
 		if err != nil {
@@ -238,7 +263,7 @@ func (m MySqlConfig) CustomizeTLS() error {
 	if ok := caBundle.AppendCertsFromPEM(pemCA); ok {
 		tlsCfg.RootCAs = caBundle
 	} else {
-		return fmt.Errorf("failed parsing pem-encoded CA certificates from %s", m.SslCa)
+		return fmt.Errorf("failed to parse pem-encoded CA certificates from %s", m.SslCa)
 	}
 	if m.SslCert != "" && m.SslKey != "" {
 		certPairs := make([]tls.Certificate, 0, 1)
