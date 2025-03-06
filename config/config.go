@@ -134,22 +134,6 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 		}
 	}
 
-	httpAuth := os.Getenv("HTTP_AUTH")
-	var user, password string
-
-	if httpAuth != "" {
-		data := strings.SplitN(httpAuth, ":", 2)
-		if len(data) != 2 || data[0] == "" || data[1] == "" {
-			logger.Error("HTTP_AUTH should be formatted as user:password")
-			return fmt.Errorf("HTTP_AUTH should be formatted as user:password")
-		}
-		user = data[0]
-		password = data[1]
-	}
-	if user != "" && password != "" {
-		logger.Info("HTTP basic authentication is enabled")
-	}
-
 	cfg.ValueMapper = os.ExpandEnv
 	config := &Config{}
 	m := make(map[string]MySqlConfig)
@@ -163,20 +147,18 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 		mysqlcfg := &MySqlConfig{
 			TlsInsecureSkipVerify: tlsInsecureSkipVerify,
 		}
-		if user != "" {
-			mysqlcfg.User = user
-			mysqlcfg.Password = password
-		}
-		if mysqlSSLCAFile != nil {
-			mysqlcfg.SslCa = *mysqlSSLCAFile
-		}
-		if mysqlSSLCertFile != nil {
-			mysqlcfg.SslCert = *mysqlSSLCertFile
-		}
-		if mysqlSSLKeyFile != nil {
-			mysqlcfg.SslKey = *mysqlSSLKeyFile
-		}
 
+		if sectionName == "client" {
+			if mysqlSSLCAFile != nil {
+				mysqlcfg.SslCa = *mysqlSSLCAFile
+			}
+			if mysqlSSLCertFile != nil {
+				mysqlcfg.SslCert = *mysqlSSLCertFile
+			}
+			if mysqlSSLKeyFile != nil {
+				mysqlcfg.SslKey = *mysqlSSLKeyFile
+			}
+		}
 		err = sec.StrictMapTo(mysqlcfg)
 		if err != nil {
 			logger.Error("failed to parse config", "section", sectionName, "err", err)
@@ -193,6 +175,7 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 	if len(config.Sections) == 0 {
 		return fmt.Errorf("no configuration found")
 	}
+	logger.Info("loaded config", "section", config.Sections)
 	ch.Lock()
 	ch.Config = config
 	ch.Unlock()
