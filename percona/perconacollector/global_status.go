@@ -62,7 +62,7 @@ var (
 	globalBufferPoolDirtyPagesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(cl.Namespace, globalStatus, "buffer_pool_dirty_pages"),
 		"Innodb buffer pool dirty pages.",
-		[]string{}, nil,
+		[]string{"dirty"}, nil,
 	)
 	globalBufferPoolPageChangesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(cl.Namespace, globalStatus, "buffer_pool_page_changes_total"),

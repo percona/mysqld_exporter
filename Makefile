@@ -96,7 +96,12 @@ GO_BUILD_LDFLAGS = -ldflags " \
 
 export PMM_RELEASE_PATH?=.
 
-release:
+release:          ## Build release binary
 	go build $(GO_BUILD_LDFLAGS) -o $(PMM_RELEASE_PATH)/mysqld_exporter
+
+dev:              ## Build and copy the binary to PMM container
+	GOOS=linux GOARCH=amd64 make release
+	docker cp mysqld_exporter pmm-server:/usr/local/percona/pmm/exporters/mysqld_exporter
+	docker exec -t --user root pmm-server chown pmm:pmm /usr/local/percona/pmm/exporters/mysqld_exporter
 
 .PHONY: all init style format build test vet tarball docker env-up env-down help default
