@@ -136,47 +136,6 @@ var scrapers = map[collector.Scraper]bool{
 	pcl.NewStandardProcess():                              false,
 }
 
-// // TODO Remove
-// var scrapersHr = map[collector.Scraper]struct{}{
-// 	pcl.ScrapeGlobalStatus{}:                  {},
-// 	collector.ScrapeInnodbMetrics{}:           {},
-// 	pcl.ScrapeCustomQuery{Resolution: pcl.HR}: {},
-// }
-
-// // TODO Remove
-// var scrapersMr = map[collector.Scraper]struct{}{
-// 	collector.ScrapeSlaveStatus{}:             {},
-// 	pcl.ScrapeProcesslist{}:                   {},
-// 	collector.ScrapePerfEventsWaits{}:         {},
-// 	collector.ScrapePerfFileEvents{}:          {},
-// 	collector.ScrapePerfTableLockWaits{}:      {},
-// 	collector.ScrapeQueryResponseTime{}:       {},
-// 	collector.ScrapeEngineInnodbStatus{}:      {},
-// 	pcl.ScrapeInnodbCmp{}:                     {},
-// 	pcl.ScrapeInnodbCmpMem{}:                  {},
-// 	pcl.ScrapeCustomQuery{Resolution: pcl.MR}: {},
-// }
-
-// // TODO Remove
-// var scrapersLr = map[collector.Scraper]struct{}{
-// 	collector.ScrapeGlobalVariables{}:             {},
-// 	collector.ScrapePlugins{}:                     {},
-// 	collector.ScrapeTableSchema{}:                 {},
-// 	collector.ScrapeAutoIncrementColumns{}:        {},
-// 	collector.ScrapeBinlogSize{}:                  {},
-// 	collector.ScrapePerfTableIOWaits{}:            {},
-// 	collector.ScrapePerfIndexIOWaits{}:            {},
-// 	collector.ScrapePerfFileInstances{}:           {},
-// 	collector.ScrapeUserStat{}:                    {},
-// 	collector.ScrapeTableStat{}:                   {},
-// 	collector.ScrapePerfEventsStatements{}:        {},
-// 	collector.ScrapeClientStat{}:                  {},
-// 	collector.ScrapeInfoSchemaInnodbTablespaces{}: {},
-// 	collector.ScrapeEngineTokudbStatus{}:          {},
-// 	collector.ScrapeHeartbeat{}:                   {},
-// 	pcl.ScrapeCustomQuery{Resolution: pcl.LR}:     {},
-// }
-
 func filterScrapers(scrapers []collector.Scraper, collectParams []string) []collector.Scraper {
 	var filteredScrapers []collector.Scraper
 
@@ -315,7 +274,7 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 			// we should still handle metrics from collectors that succeeded.
 			ErrorHandling: promhttp.ContinueOnError,
 		}
-		// Enable detailed error logging if requested.
+		// Enable detailed error logging if log.level is `info` or higher.
 		if logger.Enabled(context.Background(), slog.LevelInfo) {
 			hOpts.ErrorLog = eLogger
 		}
@@ -359,27 +318,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Register only scrapers enabled by flag, or all if --collect.all is set.
+	enabledScrapers := []collector.Scraper{}
+	for scraper, enabled := range scraperFlags {
+		if *enabled || *collectAll {
+			logger.Info("Scraper enabled", "scraper", scraper.Name())
+			enabledScrapers = append(enabledScrapers, scraper)
+		}
+	}
+
 	// Use default mux for /debug/vars and /debug/pprof
 	mux := http.DefaultServeMux
 
-	// Defines what to scrape in each resolution.
-	all := enabledScrapers(scraperFlags, logger)
-
 	// Handle all metrics on one endpoint.
-	mux.Handle(*metricsPath, newHandler(all, logger))
+	mux.Handle(*metricsPath, newHandler(enabledScrapers, logger))
 
-	srv := &http.Server{
-		Handler: mux,
-	}
-
-	// Register only scrapers enabled by flag, or all if --collect.all is set.
-	// enabledScrapers := []collector.Scraper{}
-	// for scraper, enabled := range scraperFlags {
-	// 	if *enabled || *collectAll{
-	// 		logger.Info("Scraper enabled", "scraper", scraper.Name())
-	// 		enabledScrapers = append(enabledScrapers, scraper)
-	// 	}
-	// }
 	// handlerFunc := newHandler(enabledScrapers, logger)
 	// http.Handle(*metricsPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handlerFunc))
 
@@ -403,7 +356,7 @@ func main() {
 		mux.Handle("/", landingPage)
 	}
 
-	mux.HandleFunc("/probe", handleProbe(all, logger))
+	mux.HandleFunc("/probe", handleProbe(enabledScrapers, logger))
 	mux.HandleFunc("/-/reload", func(w http.ResponseWriter, r *http.Request) {
 		if err := c.ReloadConfig(*configMycnf, *mysqldAddress, *mysqldUser, *tlsInsecureSkipVerify, logger); err != nil {
 			logger.Warn("Error reloading host config", "file", *configMycnf, "error", err)
@@ -412,21 +365,12 @@ func main() {
 		_, _ = w.Write([]byte(`ok`))
 	})
 
+	srv := &http.Server{
+		Handler: mux,
+	}
+
 	if err := web.ListenAndServe(srv, toolkitFlags, logger); err != nil {
 		logger.Error("Error starting HTTP server", "err", err)
 		os.Exit(1)
 	}
-}
-
-func enabledScrapers(scraperFlags map[collector.Scraper]*bool, logger *slog.Logger) (all []collector.Scraper) {
-	for scraper, enabled := range scraperFlags {
-		if *collectAll || *enabled {
-			if _, ok := scrapers[scraper]; ok {
-				all = append(all, scraper)
-				logger.Info("Scraper enabled", "scraper", scraper.Name())
-			}
-		}
-	}
-
-	return all
 }
