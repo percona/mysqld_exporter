@@ -280,7 +280,6 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 		}
 
 		collect := q["collect[]"]
-		// logger.Debug("msg", "collect[] params", strings.Join(collect, ","))
 		if len(collect) > 0 {
 			logger.Info("msg", "collect[] params", strings.Join(collect, ","))
 		}
@@ -311,13 +310,18 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 		}
 
 		eLogger := &errLogger{logger: logger}
-		// Delegate http serving to Prometheus client library, which will call collector.Collect.
-		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+		hOpts := promhttp.HandlerOpts{
 			// mysqld_exporter has multiple collectors; if one fails,
-			// we still should handle metrics from collectors that succeeded.
+			// we should still handle metrics from collectors that succeeded.
 			ErrorHandling: promhttp.ContinueOnError,
-			ErrorLog:      eLogger,
-		})
+		}
+		// Enable detailed error logging if requested.
+		if logger.Enabled(context.Background(), slog.LevelInfo) {
+			hOpts.ErrorLog = eLogger
+		}
+		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		h := promhttp.HandlerFor(gatherers, hOpts)
+
 		h.ServeHTTP(w, r)
 	}
 }
