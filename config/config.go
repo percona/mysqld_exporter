@@ -45,17 +45,17 @@ var (
 	})
 
 	mysqlSSLCAFile = kingpin.Flag(
-		"mysql.ssl-ca-file",
+		"tls.ssl-ca",
 		"SSL CA file for the MySQL connection",
 	).ExistingFile()
 
 	mysqlSSLCertFile = kingpin.Flag(
-		"mysql.ssl-cert-file",
+		"tls.ssl-cert",
 		"SSL Cert file for the MySQL connection",
 	).ExistingFile()
 
 	mysqlSSLKeyFile = kingpin.Flag(
-		"mysql.ssl-key-file",
+		"tls.ssl-key",
 		"SSL Key file for the MySQL connection",
 	).ExistingFile()
 
