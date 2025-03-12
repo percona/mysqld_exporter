@@ -10,6 +10,7 @@
 .idea
 *.iml
 /vendor
+/test
 /percona/tests/assets/mysqld_exporter
 /percona/tests/assets/mysqld_exporter_percona
 /percona/tests/assets/metrics.names.new.txt
