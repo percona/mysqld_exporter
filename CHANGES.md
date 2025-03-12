@@ -3,6 +3,7 @@
 ## Environment variables
 
 - `DATA_SOURCE_NAME` environment variable is deprecated
+- `HTTP_AUTH` environment variable is deprecated
 
 ## Flags
 
@@ -20,6 +21,6 @@
 
 ## Deprecated endpoints
 
-- `/metrics-hr` endpoint is deprecated and removed
-- `/metrics-mr` endpooint is deprecated and removed
-- `/metrics-lr` endpoint is deprecated and removed
+- `/metrics-hr` endpoint is deprecated
+- `/metrics-mr` endpooint is deprecated
+- `/metrics-lr` endpoint is deprecated

@@ -24,7 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -43,21 +42,6 @@ var (
 		Name:      "config_last_reload_success_timestamp_seconds",
 		Help:      "Timestamp of the last successful configuration reload.",
 	})
-
-	mysqlSSLCAFile = kingpin.Flag(
-		"tls.ssl-ca",
-		"SSL CA file for the MySQL connection",
-	).ExistingFile()
-
-	mysqlSSLCertFile = kingpin.Flag(
-		"tls.ssl-cert",
-		"SSL Cert file for the MySQL connection",
-	).ExistingFile()
-
-	mysqlSSLKeyFile = kingpin.Flag(
-		"tls.ssl-key",
-		"SSL Key file for the MySQL connection",
-	).ExistingFile()
 
 	opts = ini.LoadOptions{
 		// Do not error on nonexistent file to allow empty string as filename input
@@ -148,17 +132,6 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 			TlsInsecureSkipVerify: tlsInsecureSkipVerify,
 		}
 
-		if sectionName == "client" {
-			if mysqlSSLCAFile != nil {
-				mysqlcfg.SslCa = *mysqlSSLCAFile
-			}
-			if mysqlSSLCertFile != nil {
-				mysqlcfg.SslCert = *mysqlSSLCertFile
-			}
-			if mysqlSSLKeyFile != nil {
-				mysqlcfg.SslKey = *mysqlSSLKeyFile
-			}
-		}
 		err = sec.StrictMapTo(mysqlcfg)
 		if err != nil {
 			logger.Error("failed to parse config", "section", sectionName, "err", err)
