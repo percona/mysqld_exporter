@@ -54,8 +54,8 @@ var (
 	}
 )
 
-func processQueryResponseTimeTable(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, query string, i int) error {
-	db := instance.GetDB()
+func processQueryResponseTimeTable(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, query string, i int) error {
+	db := instance.getDB()
 	queryDistributionRows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return err
@@ -118,9 +118,9 @@ func (ScrapeQueryResponseTime) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeQueryResponseTime) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapeQueryResponseTime) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var queryStats uint8
-	db := instance.GetDB()
+	db := instance.getDB()
 	err := db.QueryRowContext(ctx, queryResponseCheckQuery).Scan(&queryStats)
 	if err != nil {
 		logger.Debug("Query response time distribution is not available.")

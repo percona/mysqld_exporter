@@ -31,7 +31,7 @@ func TestScrapeBinlogSize(t *testing.T) {
 	}
 	defer db.Close()
 
-	inst := &Instance{db: db}
+	inst := &instance{db: db}
 
 	mock.ExpectQuery(logbinQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(1))
 

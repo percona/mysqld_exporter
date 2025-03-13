@@ -71,9 +71,9 @@ func (ScrapeBinlogSize) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeBinlogSize) Scrape(ctx context.Context, Instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapeBinlogSize) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var logBin uint8
-	db := Instance.GetDB()
+	db := instance.getDB()
 	err := db.QueryRowContext(ctx, logbinQuery).Scan(&logBin)
 	if err != nil {
 		return err

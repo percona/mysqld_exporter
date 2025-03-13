@@ -45,8 +45,8 @@ func (ScrapePerfReplicationGroupMembers) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapePerfReplicationGroupMembers) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := instance.GetDB()
+func (ScrapePerfReplicationGroupMembers) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	perfReplicationGroupMembersRows, err := db.QueryContext(ctx, perfReplicationGroupMembersQuery)
 	if err != nil {
 		return err

@@ -29,7 +29,7 @@ func TestScrapeTableStat(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{db: db}
+	inst := &instance{db: db}
 
 	mock.ExpectQuery(sanitizeQuery(userstatCheckQuery)).WillReturnRows(sqlmock.NewRows([]string{"Variable_name", "Value"}).
 		AddRow("userstat", "ON"))

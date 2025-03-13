@@ -45,15 +45,15 @@ var (
 	).Default("1m").Duration()
 )
 
-type Instance struct {
+type instance struct {
 	db                *sql.DB
 	flavor            string
 	version           semver.Version
 	versionMajorMinor float64
 }
 
-func newInstance(dsn string) (*Instance, error) {
-	i := &Instance{}
+func newInstance(dsn string) (*instance, error) {
+	i := &instance{}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
@@ -89,23 +89,18 @@ func newInstance(dsn string) (*Instance, error) {
 	return i, nil
 }
 
-// GetDB returns the database connection for the instance.
-func (i *Instance) GetDB() *sql.DB {
+// getDB returns the database connection for the instance.
+func (i *instance) getDB() *sql.DB {
 	return i.db
 }
 
-// SetDB sets the database connection for the instance. Used for testing only.
-func (i *Instance) SetDB(db *sql.DB) {
-	i.db = db
-}
-
 // Close closes the database connection.
-func (i *Instance) Close() error {
+func (i *instance) Close() error {
 	return i.db.Close()
 }
 
 // Ping checks connection availability and possibly invalidates the connection if it fails.
-func (i *Instance) Ping() error {
+func (i *instance) Ping() error {
 	if err := i.db.Ping(); err != nil {
 		if cerr := i.Close(); cerr != nil {
 			return err

@@ -74,7 +74,7 @@ func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbNa
 	}
 	ch := make(chan prometheus.Metric)
 	go func() { //nolint:wsl
-		instance := &Instance{
+		instance := &instance{
 			db: db,
 		}
 		if err = (ScrapeTableSchema{}).Scrape(ctx, instance, ch, promslog.NewNopLogger()); err != nil {

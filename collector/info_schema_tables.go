@@ -96,9 +96,9 @@ func (ScrapeTableSchema) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeTableSchema) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapeTableSchema) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var dbList []string
-	db := instance.GetDB()
+	db := instance.getDB()
 
 	// This query will affect only 8.0 and higher versions of MySQL, othervise it will be ignored
 	_, err := db.ExecContext(ctx, "/*!80000 set session information_schema_stats_expiry=0 */")

@@ -192,14 +192,14 @@ func (ScrapePerfEventsStatements) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapePerfEventsStatements) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapePerfEventsStatements) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	perfQuery := fmt.Sprintf(
 		perfEventsStatementsQuery,
 		*perfEventsStatementsDigestTextLimit,
 		*perfEventsStatementsTimeLimit,
 		*perfEventsStatementsLimit,
 	)
-	db := instance.GetDB()
+	db := instance.getDB()
 	// Timers here are returned in picoseconds.
 	perfSchemaEventsStatementsRows, err := db.QueryContext(ctx, perfQuery)
 	if err != nil {

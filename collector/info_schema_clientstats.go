@@ -159,9 +159,9 @@ func (ScrapeClientStat) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeClientStat) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapeClientStat) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var varName, varVal string
-	db := instance.GetDB()
+	db := instance.getDB()
 	err := db.QueryRowContext(ctx, userstatCheckQuery).Scan(&varName, &varVal)
 	if err != nil {
 		logger.Debug("Detailed client stats are not available.")

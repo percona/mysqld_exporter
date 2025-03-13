@@ -37,7 +37,6 @@ import (
 
 	"github.com/percona/mysqld_exporter/collector"
 	"github.com/percona/mysqld_exporter/config"
-	pcl "github.com/percona/mysqld_exporter/percona/perconacollector"
 )
 
 var (
@@ -89,12 +88,12 @@ var _ promhttp.Logger = &errLogger{}
 
 // scrapers lists all possible collection methods and if they should be enabled by default.
 var scrapers = map[collector.Scraper]bool{
-	pcl.ScrapeGlobalStatus{}:                              false,
+	collector.PScrapeGlobalStatus{}:                       false, // by Percona
 	collector.ScrapeGlobalStatus{}:                        false,
 	collector.ScrapeGlobalVariables{}:                     false,
 	collector.ScrapePlugins{}:                             false,
 	collector.ScrapeSlaveStatus{}:                         false,
-	pcl.ScrapeProcesslist{}:                               false,
+	collector.PScrapeProcesslist{}:                        false, // by Percona
 	collector.ScrapeProcesslist{}:                         false,
 	collector.ScrapeUser{}:                                false,
 	collector.ScrapeTableSchema{}:                         false,
@@ -119,21 +118,21 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeClientStat{}:                          false,
 	collector.ScrapeTableStat{}:                           false,
 	collector.ScrapeSchemaStat{}:                          false,
+	collector.PScrapeInnodbCmp{}:                          false, // by Percona
 	collector.ScrapeInnodbCmp{}:                           false,
+	collector.PScrapeInnodbCmpMem{}:                       false, // by Percona
 	collector.ScrapeInnodbCmpMem{}:                        false,
-	pcl.ScrapeInnodbCmp{}:                                 false,
-	pcl.ScrapeInnodbCmpMem{}:                              false,
 	collector.ScrapeQueryResponseTime{}:                   false,
 	collector.ScrapeEngineTokudbStatus{}:                  false,
 	collector.ScrapeEngineInnodbStatus{}:                  false,
 	collector.ScrapeHeartbeat{}:                           false,
 	collector.ScrapeSlaveHosts{}:                          false,
 	collector.ScrapeReplicaHost{}:                         false,
-	pcl.ScrapeCustomQuery{Resolution: pcl.HR}:             false,
-	pcl.ScrapeCustomQuery{Resolution: pcl.MR}:             false,
-	pcl.ScrapeCustomQuery{Resolution: pcl.LR}:             false,
-	pcl.NewStandardGo():                                   false,
-	pcl.NewStandardProcess():                              false,
+	collector.ScrapeCustomQuery{Resolution: collector.HR}: false, // by Percona
+	collector.ScrapeCustomQuery{Resolution: collector.MR}: false, // by Percona
+	collector.ScrapeCustomQuery{Resolution: collector.LR}: false, // by Percona
+	collector.NewStandardGo():                             false, // by Percona
+	collector.NewStandardProcess():                        false, // by Percona
 }
 
 func filterScrapers(scrapers []collector.Scraper, collectParams []string) []collector.Scraper {

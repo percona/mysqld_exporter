@@ -13,7 +13,7 @@
 
 // Scrape custom queries
 
-package perconacollector
+package collector
 
 import (
 	"context"
@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
-	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/yaml.v2"
 )
@@ -121,7 +120,7 @@ func (scq ScrapeCustomQuery) Version() float64 {
 }
 
 // Scrape collects data.
-func (scq ScrapeCustomQuery) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (scq ScrapeCustomQuery) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	cq := CustomQuery{
 		customMetricMap: make(map[string]MetricMapNamespace),
 		customQueryMap:  make(map[string]string),
@@ -161,7 +160,7 @@ func (scq ScrapeCustomQuery) Scrape(ctx context.Context, instance *cl.Instance, 
 
 	cq.mappingMtx.RLock()
 	defer cq.mappingMtx.RUnlock()
-	db := instance.GetDB()
+	db := instance.getDB()
 	errMap := queryNamespaceMappings(ctx, ch, db, cq.customMetricMap, cq.customQueryMap, logger)
 	if len(errMap) > 0 {
 		errs := make([]string, 0, len(errMap))

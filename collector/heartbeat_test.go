@@ -65,7 +65,7 @@ func TestScrapeHeartbeat(t *testing.T) {
 				t.Fatalf("error opening a stub database connection: %s", err)
 			}
 			defer db.Close()
-			inst := &Instance{db: db}
+			inst := &instance{db: db}
 
 			rows := sqlmock.NewRows(tt.Columns).
 				AddRow("1487597613.001320", "1487598113.448042", 1)

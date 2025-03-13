@@ -30,7 +30,7 @@ func TestScrapeSlaveStatus(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{db: db}
+	inst := &instance{db: db}
 
 	columns := []string{"Master_Host", "Read_Master_Log_Pos", "Slave_IO_Running", "Slave_SQL_Running", "Seconds_Behind_Master"}
 	rows := sqlmock.NewRows(columns).

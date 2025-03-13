@@ -11,7 +11,7 @@
 
 ## Deprecated flags
 
-- `exporter.global-conn-pool` is deprecated, the exporter now uses a global connection pool by default
+- `exporter.global-conn-pool` is deprecated
 
 ## Deprecated metrics
 

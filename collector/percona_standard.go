@@ -11,13 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perconacollector
+package collector
 
 import (
 	"context"
 	"log/slog"
 
-	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
@@ -26,7 +25,7 @@ type standardGo struct {
 	c prometheus.Collector
 }
 
-func NewStandardGo() cl.Scraper {
+func NewStandardGo() Scraper {
 	return standardGo{
 		c: collectors.NewGoCollector(),
 	}
@@ -48,7 +47,7 @@ func (standardGo) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardGo) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (s standardGo) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }
@@ -57,7 +56,7 @@ type standardProcess struct {
 	c prometheus.Collector
 }
 
-func NewStandardProcess() cl.Scraper {
+func NewStandardProcess() Scraper {
 	return standardProcess{
 		c: collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	}
@@ -79,7 +78,7 @@ func (standardProcess) Version() float64 {
 }
 
 // Scrape collects data.
-func (s standardProcess) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (s standardProcess) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	s.c.Collect(ch)
 	return nil
 }

@@ -13,68 +13,67 @@
 
 // Scrape `information_schema.INNODB_CMPMEM`.
 
-package perconacollector
+package collector
 
 import (
 	"context"
 	"log/slog"
 
-	cl "github.com/percona/mysqld_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const innodbCmpMemQuery = `
-                SELECT
-                  page_size, buffer_pool_instance, pages_used, pages_free, relocation_ops, relocation_time
-                  FROM information_schema.innodb_cmpmem
-                `
+const pInnodbCmpMemQuery = `
+	SELECT
+		page_size, buffer_pool_instance, pages_used, pages_free, relocation_ops, relocation_time
+		FROM information_schema.innodb_cmpmem
+	`
 
 // Metric descriptors.
 var (
-	infoSchemaInnodbCmpMemPagesRead = prometheus.NewDesc(
-		prometheus.BuildFQName(cl.Namespace, cl.InformationSchema, "innodb_cmpmem_pages_used_total"),
+	pInfoSchemaInnodbCmpMemPagesRead = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, InformationSchema, "innodb_cmpmem_pages_used_total"),
 		"Number of blocks of the size PAGE_SIZE that are currently in use.",
 		[]string{"page_size", "buffer"}, nil,
 	)
-	infoSchemaInnodbCmpMemPagesFree = prometheus.NewDesc(
-		prometheus.BuildFQName(cl.Namespace, cl.InformationSchema, "innodb_cmpmem_pages_free_total"),
+	pInfoSchemaInnodbCmpMemPagesFree = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, InformationSchema, "innodb_cmpmem_pages_free_total"),
 		"Number of blocks of the size PAGE_SIZE that are currently available for allocation.",
 		[]string{"page_size", "buffer"}, nil,
 	)
-	infoSchemaInnodbCmpMemRelocationOps = prometheus.NewDesc(
-		prometheus.BuildFQName(cl.Namespace, cl.InformationSchema, "innodb_cmpmem_relocation_ops_total"),
+	pInfoSchemaInnodbCmpMemRelocationOps = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, InformationSchema, "innodb_cmpmem_relocation_ops_total"),
 		"Number of times a block of the size PAGE_SIZE has been relocated.",
 		[]string{"page_size", "buffer"}, nil,
 	)
-	infoSchemaInnodbCmpMemRelocationTime = prometheus.NewDesc(
-		prometheus.BuildFQName(cl.Namespace, cl.InformationSchema, "innodb_cmpmem_relocation_time_seconds_total"),
+	pInfoSchemaInnodbCmpMemRelocationTime = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, InformationSchema, "innodb_cmpmem_relocation_time_seconds_total"),
 		"Total time in seconds spent in relocating blocks.",
 		[]string{"page_size", "buffer"}, nil,
 	)
 )
 
 // ScrapeInnodbCmp collects from `information_schema.innodb_cmp`.
-type ScrapeInnodbCmpMem struct{}
+type PScrapeInnodbCmpMem struct{}
 
 // Name of the Scraper. Should be unique.
-func (ScrapeInnodbCmpMem) Name() string {
-	return cl.InformationSchema + ".innodb_cmpmem"
+func (PScrapeInnodbCmpMem) Name() string {
+	return InformationSchema + ".innodb_cmpmem"
 }
 
 // Help describes the role of the Scraper.
-func (ScrapeInnodbCmpMem) Help() string {
+func (PScrapeInnodbCmpMem) Help() string {
 	return "Collect metrics from information_schema.innodb_cmpmem"
 }
 
 // Version of MySQL from which scraper is available.
-func (ScrapeInnodbCmpMem) Version() float64 {
+func (PScrapeInnodbCmpMem) Version() float64 {
 	return 5.5
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeInnodbCmpMem) Scrape(ctx context.Context, instance *cl.Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := instance.GetDB()
-	informationSchemaInnodbCmpMemRows, err := db.QueryContext(ctx, innodbCmpMemQuery)
+func (PScrapeInnodbCmpMem) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
+	informationSchemaInnodbCmpMemRows, err := db.QueryContext(ctx, pInnodbCmpMemQuery)
 	if err != nil {
 		return err
 	}
@@ -92,13 +91,13 @@ func (ScrapeInnodbCmpMem) Scrape(ctx context.Context, instance *cl.Instance, ch 
 			return err
 		}
 
-		ch <- prometheus.MustNewConstMetric(infoSchemaInnodbCmpMemPagesRead, prometheus.CounterValue, pages_used, page_size, buffer_pool)
-		ch <- prometheus.MustNewConstMetric(infoSchemaInnodbCmpMemPagesFree, prometheus.CounterValue, pages_free, page_size, buffer_pool)
-		ch <- prometheus.MustNewConstMetric(infoSchemaInnodbCmpMemRelocationOps, prometheus.CounterValue, relocation_ops, page_size, buffer_pool)
-		ch <- prometheus.MustNewConstMetric(infoSchemaInnodbCmpMemRelocationTime, prometheus.CounterValue, (relocation_time / 1000), page_size, buffer_pool)
+		ch <- prometheus.MustNewConstMetric(pInfoSchemaInnodbCmpMemPagesRead, prometheus.CounterValue, pages_used, page_size, buffer_pool)
+		ch <- prometheus.MustNewConstMetric(pInfoSchemaInnodbCmpMemPagesFree, prometheus.CounterValue, pages_free, page_size, buffer_pool)
+		ch <- prometheus.MustNewConstMetric(pInfoSchemaInnodbCmpMemRelocationOps, prometheus.CounterValue, relocation_ops, page_size, buffer_pool)
+		ch <- prometheus.MustNewConstMetric(pInfoSchemaInnodbCmpMemRelocationTime, prometheus.CounterValue, (relocation_time / 1000), page_size, buffer_pool)
 	}
 	return nil
 }
 
 // check interface
-var _ cl.Scraper = ScrapeInnodbCmpMem{}
+var _ Scraper = PScrapeInnodbCmpMem{}

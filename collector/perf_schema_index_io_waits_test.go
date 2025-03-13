@@ -30,7 +30,7 @@ func TestScrapePerfIndexIOWaits(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{db: db}
+	inst := &instance{db: db}
 
 	columns := []string{"OBJECT_SCHEMA", "OBJECT_NAME", "INDEX_NAME", "COUNT_FETCH", "COUNT_INSERT", "COUNT_UPDATE", "COUNT_DELETE", "SUM_TIMER_FETCH", "SUM_TIMER_INSERT", "SUM_TIMER_UPDATE", "SUM_TIMER_DELETE"}
 	rows := sqlmock.NewRows(columns).

@@ -11,19 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perconacollector
+package collector
 
 import (
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/alecthomas/kingpin/v2"
-	cl "github.com/percona/mysqld_exporter/collector"
+
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/promslog"
@@ -42,41 +41,6 @@ experiment_garden:
         description: "Amount fruits in the garden"
 
 `
-
-func readMetric(m prometheus.Metric) MetricResult {
-	pb := &dto.Metric{}
-	m.Write(pb)
-	labels := make(labelMap, len(pb.Label))
-	for _, v := range pb.Label {
-		labels[v.GetName()] = v.GetValue()
-	}
-	if pb.Gauge != nil {
-		return MetricResult{labels: labels, value: pb.GetGauge().GetValue(), metricType: dto.MetricType_GAUGE}
-	}
-	if pb.Counter != nil {
-		return MetricResult{labels: labels, value: pb.GetCounter().GetValue(), metricType: dto.MetricType_COUNTER}
-	}
-	if pb.Untyped != nil {
-		return MetricResult{labels: labels, value: pb.GetUntyped().GetValue(), metricType: dto.MetricType_UNTYPED}
-	}
-	panic("Unsupported metric type")
-}
-
-func sanitizeQuery(q string) string {
-	q = strings.Join(strings.Fields(q), " ")
-	q = strings.Replace(q, "(", "\\(", -1)
-	q = strings.Replace(q, ")", "\\)", -1)
-	q = strings.Replace(q, "*", "\\*", -1)
-	return q
-}
-
-type labelMap map[string]string
-
-type MetricResult struct {
-	labels     labelMap
-	value      float64
-	metricType dto.MetricType
-}
 
 func TestScrapeCustomQueriesCounter(t *testing.T) {
 	convey.Convey("Custom queries counter", t, func() {
@@ -108,8 +72,7 @@ func TestScrapeCustomQueriesCounter(t *testing.T) {
 
 		ch := make(chan prometheus.Metric)
 		go func() {
-			instance := &cl.Instance{}
-			instance.SetDB(db)
+			instance := &instance{db: db}
 			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
@@ -173,8 +136,7 @@ func TestScrapeCustomQueriesDuration(t *testing.T) {
 
 		ch := make(chan prometheus.Metric)
 		go func() {
-			instance := &cl.Instance{}
-			instance.SetDB(db)
+			instance := &instance{db: db}
 			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
 				t.Errorf("error calling function on test: %s", err)
 			}
@@ -235,8 +197,7 @@ func TestScrapeCustomQueriesDbError(t *testing.T) {
 
 		expectedErr := "experiment_garden:error running query on database: experiment_garden, ERROR 1049 (42000): Unknown database 'non_existed_experiment'"
 		convey.Convey("Should raise error ", func() {
-			instance := &cl.Instance{}
-			instance.SetDB(db)
+			instance := &instance{db: db}
 			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, expectedErr)
 		})
@@ -265,8 +226,7 @@ func TestScrapeCustomQueriesIncorrectYaml(t *testing.T) {
 		ch := make(chan prometheus.Metric)
 
 		convey.Convey("Should raise error ", func() {
-			instance := &cl.Instance{}
-			instance.SetDB(db)
+			instance := &instance{db: db}
 			err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 			convey.So(err, convey.ShouldBeError, "failed to add custom queries:incorrect yaml format for bar")
 		})
@@ -283,8 +243,7 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 			t.Fatalf("error opening a stub database connection: %s", err)
 		}
 		ch := make(chan prometheus.Metric)
-		instance := &cl.Instance{}
-		instance.SetDB(db)
+		instance := &instance{db: db}
 		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 		close(ch)
 		convey.So(err, convey.ShouldBeError, "failed read dir \"/wrong/path\" for custom query. reason: open /wrong/path: no such file or directory")

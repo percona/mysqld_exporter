@@ -50,8 +50,8 @@ func (ScrapeEngineTokudbStatus) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeEngineTokudbStatus) Scrape(ctx context.Context, Instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := Instance.GetDB()
+func (ScrapeEngineTokudbStatus) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	tokudbRows, err := db.QueryContext(ctx, engineTokudbStatusQuery)
 	if err != nil {
 		return err

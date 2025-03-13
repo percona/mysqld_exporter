@@ -32,7 +32,7 @@ func TestScrapeInfoSchemaInnodbTablespaces(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{
+	inst := &instance{
 		db:     db,
 		flavor: FlavorMySQL,
 	}
@@ -80,7 +80,7 @@ func TestScrapeInfoSchemaInnodbTablespacesWithoutSpaceType(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{
+	inst := &instance{
 		db:      db,
 		flavor:  FlavorMariaDB,
 		version: semver.MustParse("10.5.0"),

@@ -46,8 +46,8 @@ func (ScrapePlugins) Version() float64 {
 	return 5.1
 }
 
-func (ScrapePlugins) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := instance.GetDB()
+func (ScrapePlugins) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	showPluginsRows, err := db.QueryContext(ctx, pluginsQuery)
 	if err != nil {
 		return err

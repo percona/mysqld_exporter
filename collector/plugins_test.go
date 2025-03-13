@@ -17,7 +17,7 @@ func TestScrapePlugins(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	instance := &Instance{db: db}
+	instance := &instance{db: db}
 	columns := []string{"Name", "Status", "Type", "Library", "License"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("INNODB_SYS_COLUMNS", "ACTIVE", "INFORMATION SCHEMA", nil, "GPL").

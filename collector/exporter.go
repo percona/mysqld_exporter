@@ -83,7 +83,7 @@ type Exporter struct {
 	logger   *slog.Logger
 	dsn      string
 	scrapers []Scraper
-	instance *Instance
+	instance *instance
 }
 
 // New returns a new MySQL exporter for the provided DSN.

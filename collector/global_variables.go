@@ -138,8 +138,8 @@ func (ScrapeGlobalVariables) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeGlobalVariables) Scrape(ctx context.Context, instance *Instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := instance.GetDB()
+func (ScrapeGlobalVariables) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	globalVariablesRows, err := db.QueryContext(ctx, globalVariablesQuery)
 	if err != nil {
 		return err

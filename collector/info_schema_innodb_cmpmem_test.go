@@ -30,7 +30,7 @@ func TestScrapeInnodbCmpMem(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
-	inst := &Instance{db: db}
+	inst := &instance{db: db}
 
 	columns := []string{"page_size", "buffer_pool", "pages_used", "pages_free", "relocation_ops", "relocation_time"}
 	rows := sqlmock.NewRows(columns).
