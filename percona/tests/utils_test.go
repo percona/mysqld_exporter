@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -39,7 +38,7 @@ func getBool(val *bool) bool {
 func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput func() string, _ error) {
 	lines, err := os.ReadFile("assets/test.exporter-flags.txt")
 	if err != nil {
-		return nil, 0, nil, errors.Wrapf(err, "Unable to read exporter args file")
+		return nil, 0, nil, fmt.Errorf("Unable to read exporter args file: %w", err)
 	}
 
 	port = -1
@@ -51,7 +50,7 @@ func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput fun
 	}
 
 	if port == -1 {
-		return nil, 0, nil, errors.Wrapf(err, "Failed to find free port in range [%d..%d]", portRangeStart, portRangeEnd)
+		return nil, 0, nil, fmt.Errorf("Failed to find free port in range [%d..%d]", portRangeStart, portRangeEnd)
 	}
 
 	linesStr := string(lines)
@@ -94,12 +93,12 @@ func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput fun
 
 	err = cmd.Start()
 	if err != nil {
-		return nil, 0, nil, errors.Wrapf(err, "Failed to start exporter.%s", collectOutput())
+		return nil, 0, nil, fmt.Errorf("Failed to start exporter. %s\n Error: %w", collectOutput(), err)
 	}
 
 	err = waitForExporter(port)
 	if err != nil {
-		return nil, 0, nil, errors.Wrapf(err, "Failed to wait for exporter.%s", collectOutput())
+		return nil, 0, nil, fmt.Errorf("Failed to wait for exporter. %s\n Error: %w", collectOutput(), err)
 	}
 
 	return cmd, port, collectOutput, nil
@@ -108,12 +107,12 @@ func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput fun
 func stopExporter(cmd *exec.Cmd, collectOutput func() string) error {
 	err := cmd.Process.Signal(unix.SIGINT)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to send SIGINT to exporter process.%s\n", collectOutput())
+		return fmt.Errorf("Failed to send SIGINT to exporter process. %s\n Error: %w", collectOutput(), err)
 	}
 
 	err = cmd.Wait()
 	if err != nil && err.Error() != "signal: interrupt" {
-		return errors.Wrapf(err, "Failed to wait for exporter process termination.%s\n", collectOutput())
+		return fmt.Errorf("Failed to wait for exporter process termination. %s\n Error: %w", collectOutput(), err)
 	}
 
 	return nil
