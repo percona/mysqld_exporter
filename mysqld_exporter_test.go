@@ -129,11 +129,66 @@ func testLanding(t *testing.T, data bin) {
 	}
 	got := string(body)
 
-	expected := `
-<h2>Prometheus Exporter for MySQL servers</h2>
+	expected := `<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySQLd Exporter</title>
+    <style>body {
+  font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,Liberation Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;
+  margin: 0;
+}
+header {
+  background-color: #e6522c;
+  color: #fff;
+  font-size: 1rem;
+  padding: 1rem;
+}
+main {
+  padding: 1rem;
+}
+label {
+  display: inline-block;
+  width: 0.5em;
+}
+#pprof {
+  border: black 2px solid;
+  padding: 1rem;
+  width: fit-content;
+}
+
+</style>
+  </head>
+  <body>
+    <header>
+      <h1>MySQLd Exporter</h1>
+    </header>
+    <main>
+      <h2>Prometheus Exporter for MySQL servers</h2>
+      <div>Version: (version=gotest-version, branch=gotest-branch, revision=gotest-revision)</div>
+      <div>
+        <ul>
+          
+          <li><a href="/metrics">Metrics</a></li>
+          
+        </ul>
+      </div>
+      
+      
+      <div id="pprof">
+      Download a detailed report of resource usage (pprof format, from the Go runtime):
+      <ul>
+        <li><a href="debug/pprof/heap">heap usage (memory)</a>
+        <li><a href="debug/pprof/profile?seconds=60">CPU usage (60 second profile)</a>
+      </ul>
+      To visualize and share profiles you can upload to <a href="https://pprof.me" target="_blank">pprof.me</a>
+      </div>
+    </main>
+  </body>
+</html>
 `
-	if !strings.Contains(got, expected) {
-		t.Fatalf("the web page does not contain expected content: \n%s", cmp.Diff(got, expected))
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Fatalf("expected != got \n%v\n", diff)
 	}
 }
 

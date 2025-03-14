@@ -37,6 +37,11 @@ env-up:           ## Start MySQL and copy ssl certificates to /tmp
 	@docker container cp mysqld_exporter_db:/var/lib/mysql/client-key.pem $(TESTDIR)
 	@docker container cp mysqld_exporter_db:/var/lib/mysql/ca.pem $(TESTDIR)
 
+.PHONY: test-docker-single-exporter
+test-docker-single-exporter:
+	@echo ">> testing docker image for single exporter"
+	./test_image.sh "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" 9104
+
 env-down:         ## Stop MySQL and clean up certs
 	@docker-compose down -v
 	@rm -rf ${TESTDIR}

@@ -32,6 +32,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
+
 	"github.com/prometheus/exporter-toolkit/web"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
@@ -242,8 +243,6 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 			logger.Info("msg", "collect[] params", strings.Join(collect, ","))
 		}
 
-		filteredScrapers := filterScrapers(scrapers, collect)
-
 		var dsn string
 		target := ""
 		if q.Has("target") {
@@ -258,6 +257,8 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 		if dsn, err = cfgsection.FormDSN(target); err != nil {
 			logger.Error("Failed to form dsn from section [client]", "err", err)
 		}
+
+		filteredScrapers := filterScrapers(scrapers, collect)
 
 		registry := prometheus.NewRegistry()
 		registry.MustRegister(collector.New(ctx, dsn, filteredScrapers, logger))

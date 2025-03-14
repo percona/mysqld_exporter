@@ -148,7 +148,6 @@ func (ch *MySqlConfigHandler) ReloadConfig(filename string, mysqldAddress string
 	if len(config.Sections) == 0 {
 		return fmt.Errorf("no configuration found")
 	}
-	logger.Info("loaded config", "section", config.Sections)
 	ch.Lock()
 	ch.Config = config
 	ch.Unlock()
