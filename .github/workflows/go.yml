@@ -16,6 +16,8 @@ jobs:
         mysql-image:
           - mysql/mysql-server:5.7
           - mysql/mysql-server:8.0
+          - mysql:8.4
+          - mysql:9.0
           - mariadb:10.5
           - mariadb:10.6
           - mariadb:10.11
