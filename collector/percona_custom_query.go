@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright 2018 The Prometheus Authors, 2023 Percona LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -134,7 +134,7 @@ func (scq ScrapeCustomQuery) Scrape(ctx context.Context, instance *instance, ch 
 
 	fi, err := os.ReadDir(*dirs[scq.Resolution])
 	if err != nil {
-		return fmt.Errorf("failed read dir %q for custom query. reason: %s", *dirs[scq.Resolution], err)
+		return fmt.Errorf("failed to read directory '%s' for custom query, error: %s", *dirs[scq.Resolution], err)
 	}
 
 	for _, v := range fi {
@@ -379,6 +379,8 @@ func stringToColumnUsage(s string) (ColumnUsage, error) {
 // Null types are mapped to NaN. string and []byte types are mapped as NaN and !ok.
 func dbToFloat64(t interface{}, logger *slog.Logger) (float64, bool) {
 	switch v := t.(type) {
+	case uint64:
+		return float64(v), true
 	case int64:
 		return float64(v), true
 	case float64:

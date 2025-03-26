@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright 2018 The Prometheus Authors, 2023 Percona LLC
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -246,7 +246,7 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 		instance := &instance{db: db}
 		err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger())
 		close(ch)
-		convey.So(err, convey.ShouldBeError, "failed read dir \"/wrong/path\" for custom query. reason: open /wrong/path: no such file or directory")
+		convey.So(err, convey.ShouldBeError, "failed to read directory '/wrong/path' for custom query, error: open /wrong/path: no such file or directory")
 	})
 }
 

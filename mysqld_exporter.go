@@ -240,7 +240,7 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 
 		collect := q["collect[]"]
 		if len(collect) > 0 {
-			logger.Info("msg", "collect[] params", strings.Join(collect, ","))
+			logger.Info("collect[]", "params", strings.Join(collect, ","))
 		}
 
 		var dsn string
