@@ -98,6 +98,14 @@ func (ScrapeTableSchema) Version() float64 {
 func (ScrapeTableSchema) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var dbList []string
 	db := instance.getDB()
+
+	// A fix for PMM-5684
+	// This query will affect only 8.0 and higher versions of MySQL, othervise it will be ignored
+	_, err := db.ExecContext(ctx, "/*!80000 set session information_schema_stats_expiry=0 */")
+	if err != nil {
+		return err
+	}
+
 	if *tableSchemaDatabases == "*" {
 		dbListRows, err := db.QueryContext(ctx, dbListQuery)
 		if err != nil {
