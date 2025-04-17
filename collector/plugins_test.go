@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/promslog"
 	"github.com/smartystreets/goconvey/convey"
 )
 
@@ -17,6 +17,7 @@ func TestScrapePlugins(t *testing.T) {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
+	instance := &instance{db: db}
 	columns := []string{"Name", "Status", "Type", "Library", "License"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("INNODB_SYS_COLUMNS", "ACTIVE", "INFORMATION SCHEMA", nil, "GPL").
@@ -26,7 +27,7 @@ func TestScrapePlugins(t *testing.T) {
 
 	ch := make(chan prometheus.Metric)
 	go func() {
-		if err = (ScrapePlugins{}).Scrape(context.Background(), db, ch, log.NewNopLogger()); err != nil {
+		if err = (ScrapePlugins{}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)
