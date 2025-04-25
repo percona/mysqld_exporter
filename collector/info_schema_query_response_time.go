@@ -17,12 +17,10 @@ package collector
 
 import (
 	"context"
-	"database/sql"
+	"log/slog"
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -56,7 +54,8 @@ var (
 	}
 )
 
-func processQueryResponseTimeTable(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, query string, i int) error {
+func processQueryResponseTimeTable(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, query string, i int) error {
+	db := instance.getDB()
 	queryDistributionRows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return err
@@ -119,20 +118,21 @@ func (ScrapeQueryResponseTime) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeQueryResponseTime) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeQueryResponseTime) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	var queryStats uint8
+	db := instance.getDB()
 	err := db.QueryRowContext(ctx, queryResponseCheckQuery).Scan(&queryStats)
 	if err != nil {
-		level.Debug(logger).Log("msg", "Query response time distribution is not available.")
+		logger.Debug("Query response time distribution is not available.")
 		return nil
 	}
 	if queryStats == 0 {
-		level.Debug(logger).Log("msg", "MySQL variable is OFF.", "var", "query_response_time_stats")
+		logger.Debug("MySQL variable is OFF.", "var", "query_response_time_stats")
 		return nil
 	}
 
 	for i, query := range queryResponseTimeQueries {
-		err := processQueryResponseTimeTable(ctx, db, ch, query, i)
+		err := processQueryResponseTimeTable(ctx, instance, ch, query, i)
 		// The first query should not fail if query_response_time_stats is ON,
 		// unlike the other two when the read/write tables exist only with Percona Server 5.6/5.7.
 		if i == 0 && err != nil {

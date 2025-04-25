@@ -18,11 +18,11 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -99,7 +99,8 @@ func (ScrapeGlobalStatus) Version() float64 {
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapeGlobalStatus) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	globalStatusRows, err := db.QueryContext(ctx, globalStatusQuery)
 	if err != nil {
 		return err
@@ -194,11 +195,11 @@ func (ScrapeGlobalStatus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prom
 		}
 
 		evsMap := []evsValue{
-			evsValue{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
-			evsValue{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
-			evsValue{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
-			evsValue{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
-			evsValue{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
+			{name: "min_seconds", value: 0, index: 0, help: "PXC/Galera group communication latency. Min value."},
+			{name: "avg_seconds", value: 0, index: 1, help: "PXC/Galera group communication latency. Avg value."},
+			{name: "max_seconds", value: 0, index: 2, help: "PXC/Galera group communication latency. Max value."},
+			{name: "stdev", value: 0, index: 3, help: "PXC/Galera group communication latency. Standard Deviation."},
+			{name: "sample_size", value: 0, index: 4, help: "PXC/Galera group communication latency. Sample Size."},
 		}
 
 		evsParsingSuccess := true

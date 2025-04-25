@@ -15,10 +15,9 @@ package collector
 
 import (
 	"context"
-	"database/sql"
+	"log/slog"
 	"time"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -97,11 +96,12 @@ func (ScrapePerfReplicationApplierStatsByWorker) Help() string {
 
 // Version of MySQL from which scraper is available.
 func (ScrapePerfReplicationApplierStatsByWorker) Version() float64 {
-	return 5.7
+	return 8.0
 }
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
-func (ScrapePerfReplicationApplierStatsByWorker) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapePerfReplicationApplierStatsByWorker) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	perfReplicationApplierStatsByWorkerRows, err := db.QueryContext(ctx, perfReplicationApplierStatsByWorkerQuery)
 	if err != nil {
 		return err

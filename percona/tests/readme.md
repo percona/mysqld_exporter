@@ -4,7 +4,6 @@ basic usage:
 
 1.  unpack original exporter
 
-
     make prepare-base-exporter
 
 2.a. download updated exporter from specific feature build
@@ -15,18 +14,14 @@ basic usage:
 
     make prepare-exporter-from-repo
 
-3. start test postgres_server
+3. start test mysql_server
 
-
-    make start-postgres-db
+    make start-mysql-db
 
 4. run basic performance comparison test
-
 
     make test-performance
 
 5.  run metrics list compatibility test
 
-
     make test-metrics
-
