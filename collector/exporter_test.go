@@ -66,6 +66,34 @@ func TestExporter(t *testing.T) {
 	})
 }
 
+func TestExporterDSN(t *testing.T) {
+	convey.Convey("DSN with special characters in password (w/o table)", t, func() {
+		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/"
+		exporter := New(
+			context.Background(),
+			dsn,
+			[]Scraper{
+				ScrapeGlobalStatus{},
+			},
+			promslog.NewNopLogger(),
+		)
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?lock_wait_timeout=0")
+	})
+
+	convey.Convey("DSN with special characters in password (with table)", t, func() {
+		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/mysql"
+		exporter := New(
+			context.Background(),
+			dsn,
+			[]Scraper{
+				ScrapeGlobalStatus{},
+			},
+			promslog.NewNopLogger(),
+		)
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/mysql?lock_wait_timeout=0")
+	})
+}
+
 func TestGetMySQLVersion(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping test")

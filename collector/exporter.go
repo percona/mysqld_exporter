@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -95,7 +96,8 @@ func New(ctx context.Context, dsn string, scrapers []Scraper, logger *slog.Logge
 		dsnParams = append(dsnParams, sessionSettingsParam)
 	}
 
-	if strings.Contains(dsn, "?") {
+	re := regexp.MustCompile(`@(?:unix|tcp)\([^\)]+\)\/(?:\S*)\?`)
+	if re.MatchString(dsn) {
 		dsn = dsn + "&"
 	} else {
 		dsn = dsn + "?"

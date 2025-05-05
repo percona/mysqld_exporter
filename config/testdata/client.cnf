@@ -5,3 +5,6 @@ host = server2
 [client.server1]
 user = test
 password = foo
+[client.server2]
+user = test
+password = U?fY)9s7|3gxUm

@@ -175,7 +175,15 @@ func TestFormDSN(t *testing.T) {
 			if dsn, err = section.FormDSN("unix:///run/mysqld/mysqld.sock"); err != nil {
 				t.Error(err)
 			}
-			convey.So(dsn, convey.ShouldEqual, "test:foo@unix(/run/mysqld/mysqld.sock)/")
+			convey.So(dsn, convey.ShouldEqual, "test:foo@unix(/run/mysqld/mysqld.sock)/?foo=bar")
+		})
+		convey.Convey("Password containing special characters", func() {
+			cfg := c.GetConfig()
+			section := cfg.Sections["client.server2"]
+			if dsn, err = section.FormDSN("server2:5000"); err != nil {
+				t.Error(err)
+			}
+			convey.So(dsn, convey.ShouldEqual, "test:U?fY)9s7|3gxUm@tcp(server2:5000)/")
 		})
 	})
 }
