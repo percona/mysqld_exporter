@@ -92,6 +92,32 @@ func TestExporterDSN(t *testing.T) {
 		)
 		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/mysql?lock_wait_timeout=0")
 	})
+
+	convey.Convey("DSN with special characters in password, with tls", t, func() {
+		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?tls=true"
+		exporter := New(
+			context.Background(),
+			dsn,
+			[]Scraper{
+				ScrapeGlobalStatus{},
+			},
+			promslog.NewNopLogger(),
+		)
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?tls=true&lock_wait_timeout=0")
+	})
+
+	convey.Convey("DSN with special characters in password, no tls", t, func() {
+		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/test?tls=skip-verify"
+		exporter := New(
+			context.Background(),
+			dsn,
+			[]Scraper{
+				ScrapeGlobalStatus{},
+			},
+			promslog.NewNopLogger(),
+		)
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/test?tls=skip-verify&lock_wait_timeout=0")
+	})
 }
 
 func TestGetMySQLVersion(t *testing.T) {
