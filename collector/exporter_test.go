@@ -68,7 +68,7 @@ func TestExporter(t *testing.T) {
 
 func TestExporterDSN(t *testing.T) {
 	convey.Convey("DSN with special characters in password (w/o table)", t, func() {
-		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/"
+		dsn := "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/"
 		exporter := New(
 			context.Background(),
 			dsn,
@@ -77,11 +77,11 @@ func TestExporterDSN(t *testing.T) {
 			},
 			promslog.NewNopLogger(),
 		)
-		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?lock_wait_timeout=0")
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/?lock_wait_timeout=0")
 	})
 
 	convey.Convey("DSN with special characters in password (with table)", t, func() {
-		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/mysql"
+		dsn := "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/mysql"
 		exporter := New(
 			context.Background(),
 			dsn,
@@ -90,11 +90,11 @@ func TestExporterDSN(t *testing.T) {
 			},
 			promslog.NewNopLogger(),
 		)
-		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/mysql?lock_wait_timeout=0")
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/mysql?lock_wait_timeout=0")
 	})
 
 	convey.Convey("DSN with special characters in password, with tls", t, func() {
-		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?tls=true"
+		dsn := "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/?tls=true"
 		exporter := New(
 			context.Background(),
 			dsn,
@@ -103,11 +103,11 @@ func TestExporterDSN(t *testing.T) {
 			},
 			promslog.NewNopLogger(),
 		)
-		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/?tls=true&lock_wait_timeout=0")
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/?tls=true&lock_wait_timeout=0")
 	})
 
 	convey.Convey("DSN with special characters in password, no tls", t, func() {
-		dsn := "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/test?tls=skip-verify"
+		dsn := "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/test?tls=skip-verify"
 		exporter := New(
 			context.Background(),
 			dsn,
@@ -116,7 +116,7 @@ func TestExporterDSN(t *testing.T) {
 			},
 			promslog.NewNopLogger(),
 		)
-		convey.So(exporter.dsn, convey.ShouldEqual, "test:aM?t|l.p&R)fZ@tcp(localhost:3306)/test?tls=skip-verify&lock_wait_timeout=0")
+		convey.So(exporter.dsn, convey.ShouldEqual, "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(localhost:3306)/test?tls=skip-verify&lock_wait_timeout=0")
 	})
 }
 
