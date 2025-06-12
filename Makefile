@@ -56,7 +56,7 @@ test-short:       ## Run short tests
 
 test:             ## Run all tests
 	@echo ">> running tests"
-	@$(GO) test -race $(pkgs)
+	@$(GO) test -count 1 -race $(pkgs)
 
 FILES = $(shell find . -type f -name '*.go')
 
