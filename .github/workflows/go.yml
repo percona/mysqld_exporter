@@ -12,6 +12,7 @@ jobs:
   test:
     name: Test
     strategy:
+      fail-fast: false
       matrix:
         mysql-image:
           - mysql/mysql-server:5.7
