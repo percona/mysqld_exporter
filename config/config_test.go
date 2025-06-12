@@ -183,7 +183,7 @@ func TestFormDSN(t *testing.T) {
 			if dsn, err = section.FormDSN("server2:5000"); err != nil {
 				t.Error(err)
 			}
-			convey.So(dsn, convey.ShouldEqual, "test:UfY9s73Gx?!)/|.#$%^&*-_=+@tcp(server2:5000)/")
+			convey.So(dsn, convey.ShouldEqual, "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(server2:5000)/")
 		})
 	})
 }
