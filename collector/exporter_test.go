@@ -23,7 +23,7 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 )
 
-const dsn = "root@/mysql"
+const dsn = "root@tcp(localhost:3306)/mysql"
 
 func TestExporter(t *testing.T) {
 	if testing.Short() {
