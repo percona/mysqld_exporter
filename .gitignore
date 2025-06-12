@@ -3,6 +3,7 @@
 /mysqld_exporter
 /.release
 /.tarballs
+/compose.yml
 
 *.tar.{gz,xz}
 *.test
