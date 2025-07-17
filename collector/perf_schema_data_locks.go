@@ -35,7 +35,8 @@ func (ScrapePerfDataLocks) Version() float64 {
 	return 1.0
 }
 
-func (ScrapePerfDataLocks) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+func (ScrapePerfDataLocks) Scrape(ctx context.Context, inst *collector.instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := inst.db
 	// data_locks
 	locksRows, err := db.QueryContext(ctx, `SELECT ENGINE, OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS FROM performance_schema.data_locks`)
 	if err != nil {
