@@ -35,38 +35,46 @@ func (ScrapePerfDataLocks) Version() float64 {
 	return 1.0
 }
 
-func (ScrapePerfDataLocks) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+func (ScrapePerfDataLocks) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	// data_locks
 	locksRows, err := db.QueryContext(ctx, `SELECT ENGINE, OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS FROM performance_schema.data_locks`)
-	if err == nil {
-		defer locksRows.Close()
-		for locksRows.Next() {
-			var engine, objectSchema, objectName, lockType, lockMode, lockStatus string
-			if err := locksRows.Scan(&engine, &objectSchema, &objectName, &lockType, &lockMode, &lockStatus); err == nil {
-				ch <- prometheus.MustNewConstMetric(
-					perfSchemaDataLocksDesc,
-					prometheus.GaugeValue,
-					1,
-					engine, objectSchema, objectName, lockType, lockMode, lockStatus,
-				)
-			}
+	if err != nil {
+		logger.Error("Failed to query performance_schema.data_locks", "err", err)
+		return err
+	}
+	defer locksRows.Close()
+	for locksRows.Next() {
+		var engine, objectSchema, objectName, lockType, lockMode, lockStatus string
+		if err := locksRows.Scan(&engine, &objectSchema, &objectName, &lockType, &lockMode, &lockStatus); err != nil {
+			logger.Error("Failed to scan row from data_locks", "err", err)
+			continue
 		}
+		ch <- prometheus.MustNewConstMetric(
+			perfSchemaDataLocksDesc,
+			prometheus.GaugeValue,
+			1,
+			engine, objectSchema, objectName, lockType, lockMode, lockStatus,
+		)
 	}
 	// data_lock_waits
 	waitsRows, err := db.QueryContext(ctx, `SELECT REQUESTING_ENGINE_LOCK_ID, BLOCKING_ENGINE_LOCK_ID FROM performance_schema.data_lock_waits`)
-	if err == nil {
-		defer waitsRows.Close()
-		for waitsRows.Next() {
-			var requesting, blocking string
-			if err := waitsRows.Scan(&requesting, &blocking); err == nil {
-				ch <- prometheus.MustNewConstMetric(
-					perfSchemaDataLockWaitsDesc,
-					prometheus.GaugeValue,
-					1,
-					requesting, blocking,
-				)
-			}
+	if err != nil {
+		logger.Error("Failed to query performance_schema.data_lock_waits", "err", err)
+		return err
+	}
+	defer waitsRows.Close()
+	for waitsRows.Next() {
+		var requesting, blocking string
+		if err := waitsRows.Scan(&requesting, &blocking); err != nil {
+			logger.Error("Failed to scan row from data_lock_waits", "err", err)
+			continue
 		}
+		ch <- prometheus.MustNewConstMetric(
+			perfSchemaDataLockWaitsDesc,
+			prometheus.GaugeValue,
+			1,
+			requesting, blocking,
+		)
 	}
 	return nil
 } 
