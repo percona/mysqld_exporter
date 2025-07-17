@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
+	"log/slog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
