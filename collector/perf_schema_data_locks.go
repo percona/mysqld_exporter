@@ -1,44 +1,68 @@
+// Copyright 2024 The Percona Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Scrape `performance_schema.data_locks` and `performance_schema.data_lock_waits`.
+
 package collector
 
 import (
 	"context"
-	"database/sql"
-
 	"log/slog"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type ScrapePerfDataLocks struct{}
+const (
+	perfDataLocksQuery = `
+		SELECT ENGINE, OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS
+		FROM performance_schema.data_locks`
+	perfDataLockWaitsQuery = `
+		SELECT REQUESTING_ENGINE_LOCK_ID, BLOCKING_ENGINE_LOCK_ID
+		FROM performance_schema.data_lock_waits`
+)
 
 var (
-	perfSchemaDataLocksDesc = prometheus.NewDesc(
-		"mysql_performance_schema_data_locks",
+	performanceSchemaDataLocksDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, performanceSchema, "data_locks"),
 		"Current row/table locks from performance_schema.data_locks.",
 		[]string{"engine", "object_schema", "object_name", "lock_type", "lock_mode", "lock_status"}, nil,
 	)
-	perfSchemaDataLockWaitsDesc = prometheus.NewDesc(
-		"mysql_performance_schema_data_lock_waits",
+	performanceSchemaDataLockWaitsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, performanceSchema, "data_lock_waits"),
 		"Current lock waits from performance_schema.data_lock_waits.",
 		[]string{"requesting_engine_lock_id", "blocking_engine_lock_id"}, nil,
 	)
 )
 
-func (ScrapePerfDataLocks) Name() string {
+// ScrapePerfSchemaDataLocks collects from `performance_schema.data_locks` and `performance_schema.data_lock_waits`.
+type ScrapePerfSchemaDataLocks struct{}
+
+func (ScrapePerfSchemaDataLocks) Name() string {
 	return "perf_schema.data_locks"
 }
 
-func (ScrapePerfDataLocks) Help() string {
-	return "Collects metrics from performance_schema.data_locks and data_lock_waits."
+func (ScrapePerfSchemaDataLocks) Help() string {
+	return "Collect metrics from performance_schema.data_locks and data_lock_waits"
 }
 
-func (ScrapePerfDataLocks) Version() float64 {
-	return 1.0
+func (ScrapePerfSchemaDataLocks) Version() float64 {
+	return 8.0
 }
 
-func (ScrapePerfDataLocks) Scrape(ctx context.Context, inst *collector.instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	db := inst.db
+func (ScrapePerfSchemaDataLocks) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	db := instance.getDB()
 	// data_locks
-	locksRows, err := db.QueryContext(ctx, `SELECT ENGINE, OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS FROM performance_schema.data_locks`)
+	locksRows, err := db.QueryContext(ctx, perfDataLocksQuery)
 	if err != nil {
 		logger.Error("Failed to query performance_schema.data_locks", "err", err)
 		return err
@@ -51,14 +75,15 @@ func (ScrapePerfDataLocks) Scrape(ctx context.Context, inst *collector.instance,
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(
-			perfSchemaDataLocksDesc,
+			performanceSchemaDataLocksDesc,
 			prometheus.GaugeValue,
 			1,
 			engine, objectSchema, objectName, lockType, lockMode, lockStatus,
 		)
 	}
+
 	// data_lock_waits
-	waitsRows, err := db.QueryContext(ctx, `SELECT REQUESTING_ENGINE_LOCK_ID, BLOCKING_ENGINE_LOCK_ID FROM performance_schema.data_lock_waits`)
+	waitsRows, err := db.QueryContext(ctx, perfDataLockWaitsQuery)
 	if err != nil {
 		logger.Error("Failed to query performance_schema.data_lock_waits", "err", err)
 		return err
@@ -71,11 +96,14 @@ func (ScrapePerfDataLocks) Scrape(ctx context.Context, inst *collector.instance,
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(
-			perfSchemaDataLockWaitsDesc,
+			performanceSchemaDataLockWaitsDesc,
 			prometheus.GaugeValue,
 			1,
 			requesting, blocking,
 		)
 	}
 	return nil
-} 
+}
+
+// check interface
+var _ Scraper = ScrapePerfSchemaDataLocks{} 
