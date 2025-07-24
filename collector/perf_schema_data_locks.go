@@ -68,18 +68,25 @@ func (ScrapePerfSchemaDataLocks) Scrape(ctx context.Context, instance *instance,
 		return err
 	}
 	defer locksRows.Close()
+	rowCount := 0
 	for locksRows.Next() {
 		var engine, objectSchema, objectName, lockType, lockMode, lockStatus string
 		if err := locksRows.Scan(&engine, &objectSchema, &objectName, &lockType, &lockMode, &lockStatus); err != nil {
 			logger.Error("Failed to scan row from data_locks", "err", err)
 			continue
 		}
+		logger.Debug("data_locks row", "engine", engine, "object_schema", objectSchema, "object_name", objectName, "lock_type", lockType, "lock_mode", lockMode, "lock_status", lockStatus)
 		ch <- prometheus.MustNewConstMetric(
 			performanceSchemaDataLocksDesc,
 			prometheus.GaugeValue,
 			1,
 			engine, objectSchema, objectName, lockType, lockMode, lockStatus,
 		)
+		rowCount++
+	}
+	logger.Info("data_locks rows processed", "count", rowCount)
+	if rowCount == 0 {
+		logger.Info("No rows found in performance_schema.data_locks")
 	}
 
 	// data_lock_waits
@@ -89,18 +96,25 @@ func (ScrapePerfSchemaDataLocks) Scrape(ctx context.Context, instance *instance,
 		return err
 	}
 	defer waitsRows.Close()
+	waitsCount := 0
 	for waitsRows.Next() {
 		var requesting, blocking string
 		if err := waitsRows.Scan(&requesting, &blocking); err != nil {
 			logger.Error("Failed to scan row from data_lock_waits", "err", err)
 			continue
 		}
+		logger.Debug("data_lock_waits row", "requesting", requesting, "blocking", blocking)
 		ch <- prometheus.MustNewConstMetric(
 			performanceSchemaDataLockWaitsDesc,
 			prometheus.GaugeValue,
 			1,
 			requesting, blocking,
 		)
+		waitsCount++
+	}
+	logger.Info("data_lock_waits rows processed", "count", waitsCount)
+	if waitsCount == 0 {
+		logger.Info("No rows found in performance_schema.data_lock_waits")
 	}
 	return nil
 }
