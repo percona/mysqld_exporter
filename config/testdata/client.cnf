@@ -8,3 +8,7 @@ password = foo
 [client.server2]
 user = test
 password = "UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+="
+[client.cleartextPlugin]
+user = test
+password = foo
+enable-cleartext-plugin = true

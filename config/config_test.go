@@ -138,6 +138,20 @@ func TestValidateConfig(t *testing.T) {
 		convey.So(section.User, convey.ShouldEqual, "abc")
 		convey.So(section.Password, convey.ShouldEqual, "")
 	})
+	convey.Convey("Client with cleartext password enabled", t, func() {
+		c := MySqlConfigHandler{
+			Config: &Config{},
+		}
+		os.Clearenv()
+		if err := c.ReloadConfig("testdata/client.cnf", "localhost:3306", "", true, promslog.NewNopLogger()); err != nil {
+			t.Error(err)
+		}
+		cfg := c.GetConfig()
+		section := cfg.Sections["client.cleartextPlugin"]
+		convey.So(section.User, convey.ShouldEqual, "test")
+		convey.So(section.Password, convey.ShouldEqual, "foo")
+		convey.So(section.EnableCleartextPassword, convey.ShouldBeTrue)
+	})
 }
 
 func TestFormDSN(t *testing.T) {
@@ -184,6 +198,14 @@ func TestFormDSN(t *testing.T) {
 				t.Error(err)
 			}
 			convey.So(dsn, convey.ShouldEqual, "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(server2:5000)/")
+		})
+		convey.Convey("With cleartext password enabled", func() {
+			cfg := c.GetConfig()
+			section := cfg.Sections["client.cleartextPlugin"]
+			if dsn, err = section.FormDSN(""); err != nil {
+				t.Error(err)
+			}
+			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?allowCleartextPasswords=true")
 		})
 	})
 }

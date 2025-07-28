@@ -62,16 +62,17 @@ type Config struct {
 }
 
 type MySqlConfig struct {
-	User                  string `ini:"user"`
-	Password              string `ini:"password"`
-	Host                  string `ini:"host"`
-	Port                  int    `ini:"port"`
-	Socket                string `ini:"socket"`
-	SslCa                 string `ini:"ssl-ca"`
-	SslCert               string `ini:"ssl-cert"`
-	SslKey                string `ini:"ssl-key"`
-	TlsInsecureSkipVerify bool   `ini:"ssl-skip-verfication"` //nolint:misspell
-	Tls                   string `ini:"tls"`
+	User                    string `ini:"user"`
+	Password                string `ini:"password"`
+	Host                    string `ini:"host"`
+	Port                    int    `ini:"port"`
+	Socket                  string `ini:"socket"`
+	SslCa                   string `ini:"ssl-ca"`
+	SslCert                 string `ini:"ssl-cert"`
+	SslKey                  string `ini:"ssl-key"`
+	TlsInsecureSkipVerify   bool   `ini:"ssl-skip-verfication"` //nolint:misspell
+	Tls                     string `ini:"tls"`
+	EnableCleartextPassword bool   `ini:"enable-cleartext-plugin"`
 }
 
 type MySqlConfigHandler struct {
@@ -207,6 +208,9 @@ func (m MySqlConfig) FormDSN(target string) (string, error) {
 			}
 			config.TLSConfig = "custom"
 		}
+	}
+	if m.EnableCleartextPassword {
+		config.AllowCleartextPasswords = true
 	}
 
 	return config.FormatDSN(), nil
