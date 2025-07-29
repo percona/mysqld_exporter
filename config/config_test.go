@@ -150,7 +150,7 @@ func TestValidateConfig(t *testing.T) {
 		section := cfg.Sections["client.cleartextPlugin"]
 		convey.So(section.User, convey.ShouldEqual, "test")
 		convey.So(section.Password, convey.ShouldEqual, "foo")
-		convey.So(section.EnableCleartextPassword, convey.ShouldBeTrue)
+		convey.So(section.EnableCleartextPlugin, convey.ShouldBeTrue)
 	})
 }
 
