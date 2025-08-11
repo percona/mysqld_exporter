@@ -148,17 +148,21 @@ func (e *Exporter) scrape(ctx context.Context, ch chan<- prometheus.Metric) floa
 	ch <- prometheus.MustNewConstMetric(mysqlScrapeDurationSeconds, prometheus.GaugeValue, time.Since(scrapeTime).Seconds(), "connection")
 
 	version := instance.versionMajorMinor
+	e.logger.Debug("MySQL version detected", "version", version)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	for _, scraper := range e.scrapers {
 		if version < scraper.Version() {
+			e.logger.Debug("Skipping scraper", "scraper", scraper.Name(), "version", scraper.Version(), "target", e.getTargetFromDsn())
 			continue
 		}
 
 		wg.Add(1)
+		e.logger.Debug("Starting scraper goroutine", "scraper", scraper.Name())
 		go func(scraper Scraper) {
 			defer wg.Done()
+			e.logger.Debug("Inside scraper goroutine", "scraper", scraper.Name())
 
 			defer pprof.SetGoroutineLabels(ctx)
 			scrapeCtx := pprof.WithLabels(ctx, pprof.Labels("scraper", scraper.Name()))
