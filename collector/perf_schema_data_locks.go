@@ -60,7 +60,10 @@ func (ScrapePerfSchemaDataLocks) Version() float64 {
 }
 
 func (ScrapePerfSchemaDataLocks) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	logger.Info("Starting ScrapePerfSchemaDataLocks")
 	db := instance.getDB()
+	logger.Info("after getDB ScrapePerfSchemaDataLocks")
+
 	// data_locks
 	locksRows, err := db.QueryContext(ctx, perfDataLocksQuery)
 	if err != nil {
@@ -120,4 +123,4 @@ func (ScrapePerfSchemaDataLocks) Scrape(ctx context.Context, instance *instance,
 }
 
 // check interface
-var _ Scraper = ScrapePerfSchemaDataLocks{} 
+var _ Scraper = ScrapePerfSchemaDataLocks{}
