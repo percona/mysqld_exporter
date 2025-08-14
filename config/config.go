@@ -72,6 +72,7 @@ type MySqlConfig struct {
 	SslKey                string `ini:"ssl-key"`
 	TlsInsecureSkipVerify bool   `ini:"ssl-skip-verfication"` //nolint:misspell
 	Tls                   string `ini:"tls"`
+	EnableCleartextPlugin bool   `ini:"enable-cleartext-plugin"`
 }
 
 type MySqlConfigHandler struct {
@@ -207,6 +208,9 @@ func (m MySqlConfig) FormDSN(target string) (string, error) {
 			}
 			config.TLSConfig = "custom"
 		}
+	}
+	if m.EnableCleartextPlugin {
+		config.AllowCleartextPasswords = true
 	}
 
 	return config.FormatDSN(), nil
