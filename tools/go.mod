@@ -1,13 +1,13 @@
 module github.com/percona/mysqld_exporter/tools
 
-go 1.23.6
+go 1.24.0
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/prometheus/promu v0.18.0
 	github.com/reviewdog/reviewdog v0.20.3
 	golang.org/x/tools v0.36.0
-	mvdan.cc/gofumpt v0.8.0
+	mvdan.cc/gofumpt v0.9.1
 )
 
 require (
