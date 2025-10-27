@@ -7,7 +7,7 @@ require (
 	github.com/prometheus/promu v0.18.0
 	github.com/reviewdog/reviewdog v0.20.3
 	golang.org/x/tools v0.38.0
-	mvdan.cc/gofumpt v0.9.1
+	mvdan.cc/gofumpt v0.9.2
 )
 
 require (
