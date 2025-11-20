@@ -267,7 +267,7 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 		for _, scraper := range filteredScrapers {
 			name := scraper.Name()
 			if name == "standard.go" || name == "standard.process" {
-				// these scrapers already exposes runtime/process metrics, so we disable the default gatherer to avoid duplicates
+				// these scrapers already expose runtime/process metrics, so we disable the default gatherer to avoid duplicates
 				useDefaultGatherer = false
 				break
 			}
