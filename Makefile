@@ -107,7 +107,7 @@ release:          ## Build release binary
 # dev:              ## Build and copy the binary to PMM container, restart pmm-agent
 # 	GOOS=linux GOARCH=amd64 make release
 # 	docker exec -t pmm-server supervisorctl stop pmm-agent
-# 	docker cp mysqld_exporter pmm-server:/usr/local/percona/pmm/exporters/mysqld_exporter
+# 	docker cp $(PMM_RELEASE_PATH)/mysqld_exporter pmm-server:/usr/local/percona/pmm/exporters/mysqld_exporter
 # 	docker exec -t --user root pmm-server chown pmm:pmm /usr/local/percona/pmm/exporters/mysqld_exporter
 # 	docker exec -t pmm-server supervisorctl start pmm-agent
 
