@@ -1,6 +1,6 @@
 module github.com/percona/mysqld_exporter/tools
 
-go 1.25.5
+go 1.25.7
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
