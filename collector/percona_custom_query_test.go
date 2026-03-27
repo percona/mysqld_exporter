@@ -250,6 +250,76 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 	})
 }
 
+const customQueryReplicationGroupWorker = `
+mysql_perf_schema_replication_group_worker:
+  query: "SELECT channel_name, worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view"
+  metrics:
+    - channel_name:
+        usage: "LABEL"
+        description: "The replication channel."
+    - worker_id:
+        usage: "LABEL"
+        description: "The worker thread ID. 0 for single-threaded replication; 1..N for parallel replication workers."
+    - IO_thread:
+        usage: "LABEL"
+        description: "IO thread state."
+    - SQL_thread:
+        usage: "LABEL"
+        description: "SQL thread state."
+    - transport_time_seconds:
+        usage: "GAUGE"
+        description: "Transport time in seconds."
+`
+
+func TestScrapeCustomQueriesReplicationGroupWorkerParallelReplication(t *testing.T) {
+	convey.Convey("Replication group worker with parallel replication", t, func() {
+		tmpFileName := createTmpFile(t, string(HR), customQueryReplicationGroupWorker)
+		defer os.Remove(tmpFileName)
+
+		*collectCustomQueryHrDirectory = filepath.Dir(tmpFileName)
+		defer os.Remove(*collectCustomQueryHrDirectory)
+
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("error opening a stub database connection: %s", err)
+		}
+		defer db.Close()
+
+		// Simulate parallel replication: same channel_name, multiple worker_ids.
+		columns := []string{"channel_name", "worker_id", "IO_thread", "SQL_thread", "transport_time_seconds"}
+		rows := sqlmock.NewRows(columns).
+			AddRow("default", "1", "ON", "ON", "0.5").
+			AddRow("default", "2", "ON", "ON", "0.3").
+			AddRow("default", "3", "ON", "ON", "0.7")
+		mock.ExpectQuery(sanitizeQuery("SELECT channel_name, worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view")).WillReturnRows(rows)
+
+		ch := make(chan prometheus.Metric)
+		go func() {
+			instance := &instance{db: db}
+			if err = (ScrapeCustomQuery{Resolution: HR}).Scrape(context.Background(), instance, ch, promslog.NewNopLogger()); err != nil {
+				t.Errorf("error calling function on test: %s", err)
+			}
+			close(ch)
+		}()
+
+		metricsExpected := []MetricResult{
+			{labels: labelMap{"channel_name": "default", "worker_id": "1", "IO_thread": "ON", "SQL_thread": "ON"}, value: 0.5, metricType: dto.MetricType_GAUGE},
+			{labels: labelMap{"channel_name": "default", "worker_id": "2", "IO_thread": "ON", "SQL_thread": "ON"}, value: 0.3, metricType: dto.MetricType_GAUGE},
+			{labels: labelMap{"channel_name": "default", "worker_id": "3", "IO_thread": "ON", "SQL_thread": "ON"}, value: 0.7, metricType: dto.MetricType_GAUGE},
+		}
+		convey.Convey("Each parallel worker produces a unique metric", func() {
+			for _, expect := range metricsExpected {
+				got := readMetric(<-ch)
+				convey.So(got, convey.ShouldResemble, expect)
+			}
+		})
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
 func createTmpFile(t *testing.T, resolution, content string) string {
 	// Create our Temp File
 	tempDir := os.TempDir() + "/" + resolution
