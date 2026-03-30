@@ -252,7 +252,7 @@ func TestScrapeCustomQueriesNoFile(t *testing.T) {
 
 const customQueryReplicationGroupWorker = `
 mysql_perf_schema_replication_group_worker:
-  query: "SELECT channel_name, worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view"
+  query: "SELECT channel_name, CAST(worker_id AS CHAR) as worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view"
   metrics:
     - channel_name:
         usage: "LABEL"
@@ -291,7 +291,7 @@ func TestScrapeCustomQueriesReplicationGroupWorkerParallelReplication(t *testing
 			AddRow("default", "1", "ON", "ON", "0.5").
 			AddRow("default", "2", "ON", "ON", "0.3").
 			AddRow("default", "3", "ON", "ON", "0.7")
-		mock.ExpectQuery(sanitizeQuery("SELECT channel_name, worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view")).WillReturnRows(rows)
+		mock.ExpectQuery(sanitizeQuery("SELECT channel_name, CAST(worker_id AS CHAR) as worker_id, IO_thread, SQL_thread, transport_time_seconds FROM replication_worker_view")).WillReturnRows(rows)
 
 		ch := make(chan prometheus.Metric)
 		go func() {
