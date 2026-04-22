@@ -22,12 +22,16 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const processlistInfoSchema = "information_schema"
+const processlistPerfSchema = "performance_schema"
+
 const pInfoSchemaProcesslistQuery = `
 		SELECT COALESCE(command,''),COALESCE(state,''),count(*),sum(time)
-		  FROM information_schema.processlist
+		  FROM %s.processlist
 		  WHERE ID != connection_id()
 		    AND TIME >= %d
 		  GROUP BY command,state
@@ -185,10 +189,16 @@ func (PScrapeProcesslist) Version() float64 {
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (PScrapeProcesslist) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	processQuery := fmt.Sprintf(
-		pInfoSchemaProcesslistQuery,
-		*pProcesslistMinTime,
-	)
+	usePerfSchema := instance.flavor == FlavorMySQL &&
+		(instance.version.GTE(semver.MustParse("8.0.22")) ||
+			(instance.version.GTE(semver.MustParse("5.7.39")) && instance.version.LT(semver.MustParse("8.0.0"))))
+
+	schema := processlistInfoSchema
+	if usePerfSchema {
+		schema = processlistPerfSchema
+	}
+
+	processQuery := fmt.Sprintf(pInfoSchemaProcesslistQuery, schema, *pProcesslistMinTime)
 	db := instance.getDB()
 	processlistRows, err := db.QueryContext(ctx, processQuery)
 	if err != nil {
