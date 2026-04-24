@@ -38,6 +38,13 @@ const pInfoSchemaProcesslistQuery = `
 		  ORDER BY null
 		`
 
+// MySQL version boundaries for querying perf schema
+var (
+	v8_0_22 = semver.MustParse("8.0.22")
+	v5_7_39 = semver.MustParse("5.7.39")
+	v8_0_0  = semver.MustParse("8.0.0")
+)
+
 // Tunable flags.
 var (
 	pProcesslistMinTime = kingpin.Flag(
@@ -189,9 +196,12 @@ func (PScrapeProcesslist) Version() float64 {
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (PScrapeProcesslist) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
+	// Prefer querying performance_schema.processlist instead of information_schema.processlist to avoid negative perf consequences
+	// Supported by MySQL >=5.7.39 and >=8.0.22
 	usePerfSchema := instance.flavor == FlavorMySQL &&
-		(instance.version.GTE(semver.MustParse("8.0.22")) ||
-			(instance.version.GTE(semver.MustParse("5.7.39")) && instance.version.LT(semver.MustParse("8.0.0"))))
+		instance.isPerformanceSchemaEnabled &&
+		(instance.version.GTE(v8_0_22) ||
+			(instance.version.GTE(v5_7_39) && instance.version.LT(v8_0_0)))
 
 	schema := processlistInfoSchema
 	if usePerfSchema {

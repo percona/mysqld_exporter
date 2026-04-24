@@ -15,6 +15,7 @@ package collector
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -25,9 +26,10 @@ import (
 )
 
 const (
-	FlavorMySQL   = "mysql"
-	FlavorMariaDB = "mariadb"
-	versionQuery  = "SELECT @@version;"
+	FlavorMySQL            = "mysql"
+	FlavorMariaDB          = "mariadb"
+	versionQuery           = "SELECT @@version;"
+	performanceSchemaQuery = "SELECT @@performance_schema;"
 )
 
 var (
@@ -46,10 +48,11 @@ var (
 )
 
 type instance struct {
-	db                *sql.DB
-	flavor            string
-	version           semver.Version
-	versionMajorMinor float64
+	db                         *sql.DB
+	flavor                     string
+	version                    semver.Version
+	versionMajorMinor          float64
+	isPerformanceSchemaEnabled bool
 }
 
 func newInstance(dsn string) (*instance, error) {
@@ -86,7 +89,27 @@ func newInstance(dsn string) (*instance, error) {
 		i.flavor = FlavorMySQL
 	}
 
+	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(db)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	i.isPerformanceSchemaEnabled = isPerformanceSchemaEnabled
+
 	return i, nil
+}
+
+// queryPerformanceSchemaEnabled reports whether performance_schema is enabled in the server
+func queryPerformanceSchemaEnabled(db *sql.DB) (bool, error) {
+	var enabled uint8
+	err := db.QueryRow(performanceSchemaQuery).Scan(&enabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to query performance_schema status: %w", err)
+	}
+	return enabled == 1, nil
 }
 
 // getDB returns the database connection for the instance.

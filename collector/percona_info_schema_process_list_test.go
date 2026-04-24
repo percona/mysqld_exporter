@@ -31,19 +31,22 @@ func TestPScrapeProcesslistQuerySelection(t *testing.T) {
 	}
 
 	cases := []struct {
-		name           string
-		flavor         string
-		version        semver.Version
-		expectedSchema string
+		name              string
+		flavor            string
+		version           semver.Version
+		perfSchemaEnabled bool
+		expectedSchema    string
 	}{
-		{"MySQL 8.0.22 -> perf_schema", FlavorMySQL, semver.MustParse("8.0.22"), processlistPerfSchema},
-		{"MySQL 8.0.30 -> perf_schema", FlavorMySQL, semver.MustParse("8.0.30"), processlistPerfSchema},
-		{"MySQL 5.7.39 -> perf_schema", FlavorMySQL, semver.MustParse("5.7.39"), processlistPerfSchema},
-		{"MySQL 8.0.21 -> info_schema", FlavorMySQL, semver.MustParse("8.0.21"), processlistInfoSchema},
-		{"MySQL 5.7.38 -> info_schema", FlavorMySQL, semver.MustParse("5.7.38"), processlistInfoSchema},
-		{"MySQL 8.0.0 -> info_schema", FlavorMySQL, semver.MustParse("8.0.0"), processlistInfoSchema},
-		{"MySQL 5.6.50 -> info_schema", FlavorMySQL, semver.MustParse("5.6.50"), processlistInfoSchema},
-		{"MariaDB 10.11.0 -> info_schema", FlavorMariaDB, semver.MustParse("10.11.0"), processlistInfoSchema},
+		{"MySQL 8.0.22 + PS on -> perf_schema", FlavorMySQL, semver.MustParse("8.0.22"), true, processlistPerfSchema},
+		{"MySQL 8.0.30 + PS on -> perf_schema", FlavorMySQL, semver.MustParse("8.0.30"), true, processlistPerfSchema},
+		{"MySQL 5.7.39 + PS on -> perf_schema", FlavorMySQL, semver.MustParse("5.7.39"), true, processlistPerfSchema},
+		{"MySQL 8.0.22 + PS off -> info_schema", FlavorMySQL, semver.MustParse("8.0.22"), false, processlistInfoSchema},
+		{"MySQL 5.7.39 + PS off -> info_schema", FlavorMySQL, semver.MustParse("5.7.39"), false, processlistInfoSchema},
+		{"MySQL 8.0.21 -> info_schema", FlavorMySQL, semver.MustParse("8.0.21"), true, processlistInfoSchema},
+		{"MySQL 5.7.38 -> info_schema", FlavorMySQL, semver.MustParse("5.7.38"), true, processlistInfoSchema},
+		{"MySQL 8.0.0 -> info_schema", FlavorMySQL, semver.MustParse("8.0.0"), true, processlistInfoSchema},
+		{"MySQL 5.6.50 -> info_schema", FlavorMySQL, semver.MustParse("5.6.50"), true, processlistInfoSchema},
+		{"MariaDB 10.11.0 -> info_schema", FlavorMariaDB, semver.MustParse("10.11.0"), true, processlistInfoSchema},
 	}
 
 	for _, tc := range cases {
@@ -55,9 +58,10 @@ func TestPScrapeProcesslistQuerySelection(t *testing.T) {
 			defer db.Close()
 
 			inst := &instance{
-				db:      db,
-				flavor:  tc.flavor,
-				version: tc.version,
+				db:                         db,
+				flavor:                     tc.flavor,
+				version:                    tc.version,
+				isPerformanceSchemaEnabled: tc.perfSchemaEnabled,
 			}
 
 			expectedSQL := fmt.Sprintf(pInfoSchemaProcesslistQuery, tc.expectedSchema, 0)
