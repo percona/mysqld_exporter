@@ -26,8 +26,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const processlistInfoSchema = "information_schema"
-const processlistPerfSchema = "performance_schema"
+const (
+	processlistInfoSchema = "information_schema"
+	processlistPerfSchema = "performance_schema"
+)
 
 const pInfoSchemaProcesslistQuery = `
 		SELECT COALESCE(command,''),COALESCE(state,''),count(*),sum(time)
