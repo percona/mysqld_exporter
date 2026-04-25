@@ -40,9 +40,9 @@ prepare-base-exporter:
 	tar -xf assets/mysqld_exporter_percona.tar.xz -C assets/
 
 start-mysql-db:
-	docker-compose -f assets/mysql-compose.yml up -d --force-recreate --renew-anon-volumes --remove-orphans
+	docker compose -f assets/mysql-compose.yml up -d --force-recreate --renew-anon-volumes --remove-orphans
 
 stop-mysql-db:
-	docker-compose -f assets/mysql-compose.yml down
+	docker compose -f assets/mysql-compose.yml down
 
 prepare-env-from-repo: prepare-exporter-from-repo prepare-base-exporter start-mysql-db
