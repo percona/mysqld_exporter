@@ -14,6 +14,7 @@
 package collector
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -55,7 +56,7 @@ type instance struct {
 	isPerformanceSchemaEnabled bool
 }
 
-func newInstance(dsn string) (*instance, error) {
+func newInstance(ctx context.Context, dsn string) (*instance, error) {
 	i := &instance{}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -67,7 +68,7 @@ func newInstance(dsn string) (*instance, error) {
 
 	i.db = db
 
-	version, versionString, err := queryVersion(db)
+	version, versionString, err := queryVersion(ctx, db)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -89,7 +90,7 @@ func newInstance(dsn string) (*instance, error) {
 		i.flavor = FlavorMySQL
 	}
 
-	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(db)
+	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(ctx, db)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -100,9 +101,9 @@ func newInstance(dsn string) (*instance, error) {
 }
 
 // queryPerformanceSchemaEnabled reports whether performance_schema is enabled in the server
-func queryPerformanceSchemaEnabled(db *sql.DB) (bool, error) {
+func queryPerformanceSchemaEnabled(ctx context.Context, db *sql.DB) (bool, error) {
 	var enabled uint8
-	err := db.QueryRow(performanceSchemaQuery).Scan(&enabled)
+	err := db.QueryRowContext(ctx, performanceSchemaQuery).Scan(&enabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -138,9 +139,9 @@ func (i *instance) Ping() error {
 // for MySQL: "8.0.36-28.1"
 var versionRegex = regexp.MustCompile(`^((\d+)(\.\d+)(\.\d+))`)
 
-func queryVersion(db *sql.DB) (semver.Version, string, error) {
+func queryVersion(ctx context.Context, db *sql.DB) (semver.Version, string, error) {
 	var version string
-	err := db.QueryRow(versionQuery).Scan(&version)
+	err := db.QueryRowContext(ctx, versionQuery).Scan(&version)
 	if err != nil {
 		return semver.Version{}, version, err
 	}

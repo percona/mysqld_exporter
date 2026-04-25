@@ -126,7 +126,7 @@ func TestGetMySQLVersion(t *testing.T) {
 	}
 
 	convey.Convey("Version parsing", t, func() {
-		instance, err := newInstance(dsn)
+		instance, err := newInstance(t.Context(), dsn)
 		convey.So(err, convey.ShouldBeNil)
 
 		convey.So(instance.versionMajorMinor, convey.ShouldBeBetweenOrEqual, 5.7, 11.4)
