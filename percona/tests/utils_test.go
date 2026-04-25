@@ -64,8 +64,12 @@ func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput fun
 	linesStr += fmt.Sprintf("\n--collect.custom_query.mr.directory=%s/medium-resolution", absolutePath)
 	linesStr += fmt.Sprintf("\n--collect.custom_query.lr.directory=%s/low-resolution", absolutePath)
 
-	linesArr := strings.Split(linesStr, "\n")
-
+	linesArr := make([]string, 0)
+	for _, l := range strings.Split(linesStr, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			linesArr = append(linesArr, l)
+		}
+	}
 
 	cmd = exec.Command(fileName, linesArr...)
 	cmd.Env = os.Environ()
