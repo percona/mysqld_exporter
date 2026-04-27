@@ -16,7 +16,6 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
