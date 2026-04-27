@@ -14,7 +14,6 @@
 package collector
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -71,7 +70,7 @@ func TestPScrapeProcesslistQuerySelection(t *testing.T) {
 
 			ch := make(chan prometheus.Metric)
 			go func() {
-				if err := (PScrapeProcesslist{}).Scrape(context.Background(), inst, ch, promslog.NewNopLogger()); err != nil {
+				if err := (PScrapeProcesslist{}).Scrape(t.Context(), inst, ch, promslog.NewNopLogger()); err != nil {
 					t.Errorf("error calling Scrape: %s", err)
 				}
 				close(ch)
