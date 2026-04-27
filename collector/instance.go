@@ -104,9 +104,6 @@ func newInstance(ctx context.Context, dsn string) (*instance, error) {
 func queryPerformanceSchemaEnabled(ctx context.Context, db *sql.DB) (bool, error) {
 	var enabled uint8
 	err := db.QueryRowContext(ctx, performanceSchemaQuery).Scan(&enabled)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
 	if err != nil {
 		return false, fmt.Errorf("failed to query performance_schema status: %w", err)
 	}
