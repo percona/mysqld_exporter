@@ -199,7 +199,7 @@ func (PScrapeProcesslist) Version() float64 {
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (PScrapeProcesslist) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
 	// Prefer querying performance_schema.processlist instead of information_schema.processlist to avoid negative perf consequences
-	// Supported by MySQL >=5.7.39 and >=8.0.22
+	// Supported by Percona Server/MySQL >=5.7.39 and >=8.0.22
 	usePerfSchema := instance.flavor == FlavorMySQL &&
 		instance.isPerformanceSchemaEnabled &&
 		(instance.version.GTE(v8_0_22) ||
