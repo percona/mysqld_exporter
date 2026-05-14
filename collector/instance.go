@@ -14,6 +14,7 @@
 package collector
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"regexp"
@@ -25,9 +26,10 @@ import (
 )
 
 const (
-	FlavorMySQL   = "mysql"
-	FlavorMariaDB = "mariadb"
-	versionQuery  = "SELECT @@version;"
+	FlavorMySQL            = "mysql"
+	FlavorMariaDB          = "mariadb"
+	versionQuery           = "SELECT @@version;"
+	performanceSchemaQuery = "SELECT @@performance_schema;"
 )
 
 var (
@@ -46,38 +48,24 @@ var (
 )
 
 type instance struct {
-	db                *sql.DB
-	flavor            string
-	version           semver.Version
-	versionMajorMinor float64
+	db                         *sql.DB
+	flavor                     string
+	version                    semver.Version
+	versionMajorMinor          float64
+	isPerformanceSchemaEnabled bool
 }
 
-func newInstance(dsn string) (*instance, error) {
-	i := &instance{}
-	db, err := sql.Open("mysql", dsn)
+func (i *instance) loadMetadata(ctx context.Context) error {
+	version, versionString, err := queryVersion(ctx, i.db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	db.SetMaxOpenConns(*exporterMaxOpenConns)
-	db.SetMaxIdleConns(*exporterMaxIdleConns)
-	db.SetConnMaxLifetime(*exporterConnMaxLifetime)
-
-	i.db = db
-
-	version, versionString, err := queryVersion(db)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
 	i.version = version
 
 	versionMajorMinor, err := strconv.ParseFloat(fmt.Sprintf("%d.%d", i.version.Major, i.version.Minor), 64)
 	if err != nil {
-		db.Close()
-		return nil, err
+		return err
 	}
-
 	i.versionMajorMinor = versionMajorMinor
 
 	if strings.Contains(strings.ToLower(versionString), "mariadb") {
@@ -86,7 +74,46 @@ func newInstance(dsn string) (*instance, error) {
 		i.flavor = FlavorMySQL
 	}
 
+	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(ctx, i.db)
+	if err != nil {
+		return err
+	}
+	i.isPerformanceSchemaEnabled = isPerformanceSchemaEnabled
+
+	return nil
+}
+
+func newInstance(ctx context.Context, dsn string) (*instance, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	return newInstanceFromDB(ctx, db)
+}
+
+func newInstanceFromDB(ctx context.Context, db *sql.DB) (*instance, error) {
+	i := &instance{db: db}
+	i.db.SetMaxOpenConns(*exporterMaxOpenConns)
+	i.db.SetMaxIdleConns(*exporterMaxIdleConns)
+	i.db.SetConnMaxLifetime(*exporterConnMaxLifetime)
+
+	if err := i.loadMetadata(ctx); err != nil {
+		i.db.Close()
+		return nil, err
+	}
+
 	return i, nil
+}
+
+// queryPerformanceSchemaEnabled reports whether performance_schema is enabled in the server
+func queryPerformanceSchemaEnabled(ctx context.Context, db *sql.DB) (bool, error) {
+	var enabled uint8
+	err := db.QueryRowContext(ctx, performanceSchemaQuery).Scan(&enabled)
+	if err != nil {
+		return false, fmt.Errorf("failed to query performance_schema status: %w", err)
+	}
+	return enabled == 1, nil
 }
 
 // getDB returns the database connection for the instance.
@@ -115,9 +142,9 @@ func (i *instance) Ping() error {
 // for MySQL: "8.0.36-28.1"
 var versionRegex = regexp.MustCompile(`^((\d+)(\.\d+)(\.\d+))`)
 
-func queryVersion(db *sql.DB) (semver.Version, string, error) {
+func queryVersion(ctx context.Context, db *sql.DB) (semver.Version, string, error) {
 	var version string
-	err := db.QueryRow(versionQuery).Scan(&version)
+	err := db.QueryRowContext(ctx, versionQuery).Scan(&version)
 	if err != nil {
 		return semver.Version{}, version, err
 	}

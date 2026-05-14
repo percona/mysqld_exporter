@@ -22,17 +22,30 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+const (
+	processlistInfoSchema = "information_schema"
+	processlistPerfSchema = "performance_schema"
 )
 
 const pInfoSchemaProcesslistQuery = `
 		SELECT COALESCE(command,''),COALESCE(state,''),count(*),sum(time)
-		  FROM information_schema.processlist
+		  FROM %s.processlist
 		  WHERE ID != connection_id()
 		    AND TIME >= %d
 		  GROUP BY command,state
 		  ORDER BY null
 		`
+
+// MySQL version boundaries for querying perf schema
+var (
+	v8_0_22 = semver.MustParse("8.0.22")
+	v5_7_39 = semver.MustParse("5.7.39")
+	v8_0_0  = semver.MustParse("8.0.0")
+)
 
 // Tunable flags.
 var (
@@ -185,10 +198,19 @@ func (PScrapeProcesslist) Version() float64 {
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (PScrapeProcesslist) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	processQuery := fmt.Sprintf(
-		pInfoSchemaProcesslistQuery,
-		*pProcesslistMinTime,
-	)
+	// Prefer querying performance_schema.processlist instead of information_schema.processlist to avoid negative perf consequences
+	// Supported by Percona Server/MySQL >=5.7.39 and >=8.0.22
+	usePerfSchema := instance.flavor == FlavorMySQL &&
+		instance.isPerformanceSchemaEnabled &&
+		(instance.version.GTE(v8_0_22) ||
+			(instance.version.GTE(v5_7_39) && instance.version.LT(v8_0_0)))
+
+	schema := processlistInfoSchema
+	if usePerfSchema {
+		schema = processlistPerfSchema
+	}
+
+	processQuery := fmt.Sprintf(pInfoSchemaProcesslistQuery, schema, *pProcesslistMinTime)
 	db := instance.getDB()
 	processlistRows, err := db.QueryContext(ctx, processQuery)
 	if err != nil {

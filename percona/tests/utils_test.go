@@ -53,21 +53,27 @@ func launchExporter(fileName string) (cmd *exec.Cmd, port int, collectOutput fun
 		return nil, 0, nil, fmt.Errorf("Failed to find free port in range [%d..%d]", portRangeStart, portRangeEnd)
 	}
 
-	linesStr := string(lines)
+	linesStr := strings.TrimSpace(string(lines))
 	linesStr += fmt.Sprintf("\n--web.listen-address=127.0.0.1:%d", port)
+	linesStr += fmt.Sprintf("\n--mysqld.address=%s:%d", mysqlHost, mysqlPort)
+	linesStr += fmt.Sprintf("\n--mysqld.username=%s", mysqlUser)
+	linesStr += "\n--config.my-cnf=/dev/null"
 
 	absolutePath, _ := filepath.Abs("custom-queries")
 	linesStr += fmt.Sprintf("\n--collect.custom_query.hr.directory=%s/high-resolution", absolutePath)
 	linesStr += fmt.Sprintf("\n--collect.custom_query.mr.directory=%s/medium-resolution", absolutePath)
 	linesStr += fmt.Sprintf("\n--collect.custom_query.lr.directory=%s/low-resolution", absolutePath)
 
-	linesArr := strings.Split(linesStr, "\n")
-
-	dsn := fmt.Sprintf("DATA_SOURCE_NAME=%s:%s@(%s:%d)/", mysqlUser, mysqlPassword, mysqlHost, mysqlPort)
+	linesArr := make([]string, 0)
+	for _, l := range strings.Split(linesStr, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			linesArr = append(linesArr, l)
+		}
+	}
 
 	cmd = exec.Command(fileName, linesArr...)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, dsn)
+	cmd.Env = append(cmd.Env, "MYSQLD_EXPORTER_PASSWORD="+mysqlPassword)
 
 	var outBuffer, errorBuffer bytes.Buffer
 	cmd.Stdout = &outBuffer
