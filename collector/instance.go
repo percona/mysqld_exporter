@@ -55,32 +55,17 @@ type instance struct {
 	isPerformanceSchemaEnabled bool
 }
 
-func newInstance(ctx context.Context, dsn string) (*instance, error) {
-	i := &instance{}
-	db, err := sql.Open("mysql", dsn)
+func (i *instance) loadMetadata(ctx context.Context) error {
+	version, versionString, err := queryVersion(ctx, i.db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	db.SetMaxOpenConns(*exporterMaxOpenConns)
-	db.SetMaxIdleConns(*exporterMaxIdleConns)
-	db.SetConnMaxLifetime(*exporterConnMaxLifetime)
-
-	i.db = db
-
-	version, versionString, err := queryVersion(ctx, db)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
 	i.version = version
 
 	versionMajorMinor, err := strconv.ParseFloat(fmt.Sprintf("%d.%d", i.version.Major, i.version.Minor), 64)
 	if err != nil {
-		db.Close()
-		return nil, err
+		return err
 	}
-
 	i.versionMajorMinor = versionMajorMinor
 
 	if strings.Contains(strings.ToLower(versionString), "mariadb") {
@@ -89,12 +74,34 @@ func newInstance(ctx context.Context, dsn string) (*instance, error) {
 		i.flavor = FlavorMySQL
 	}
 
-	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(ctx, db)
+	isPerformanceSchemaEnabled, err := queryPerformanceSchemaEnabled(ctx, i.db)
 	if err != nil {
-		db.Close()
-		return nil, err
+		return err
 	}
 	i.isPerformanceSchemaEnabled = isPerformanceSchemaEnabled
+
+	return nil
+}
+
+func newInstance(ctx context.Context, dsn string) (*instance, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	return newInstanceFromDB(ctx, db)
+}
+
+func newInstanceFromDB(ctx context.Context, db *sql.DB) (*instance, error) {
+	i := &instance{db: db}
+	i.db.SetMaxOpenConns(*exporterMaxOpenConns)
+	i.db.SetMaxIdleConns(*exporterMaxIdleConns)
+	i.db.SetConnMaxLifetime(*exporterConnMaxLifetime)
+
+	if err := i.loadMetadata(ctx); err != nil {
+		i.db.Close()
+		return nil, err
+	}
 
 	return i, nil
 }
