@@ -18,3 +18,8 @@
 /percona/tests/assets/metrics.names.old.txt
 /percona/tests/assets/metrics.new.txt
 /percona/tests/assets/metrics.old.txt
+
+# AI
+.cursor
+.claude
+CLAUDE.md
