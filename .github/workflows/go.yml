@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          docker compose up -d --wait --wait-timeout 20
+          docker compose up -d --wait --wait-timeout 120
           make format
           make build
           make test

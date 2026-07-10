@@ -15,9 +15,9 @@ services:
       test: [
         "CMD-SHELL",
         "if command -v mysql >/dev/null; then \
-          mysql -uroot -e 'SELECT 1;'; \
+          mysql -uroot -h127.0.0.1 -P3306 --protocol=TCP -e 'SELECT 1;'; \
         else \
-          mariadb -uroot -e 'SELECT 1;'; \
+          mariadb -uroot -h127.0.0.1 -P3306 --protocol=TCP -e 'SELECT 1;'; \
         fi || exit 1"
       ]
       interval: 10s
