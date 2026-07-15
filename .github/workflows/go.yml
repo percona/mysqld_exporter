@@ -19,6 +19,7 @@ jobs:
           - mysql/mysql-server:8.0
           - mysql:8.4
           - mysql:9.0
+          - mysql:9.7
           - mariadb:10.5
           - mariadb:10.6
           - mariadb:10.11

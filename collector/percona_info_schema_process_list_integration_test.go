@@ -54,6 +54,7 @@ func TestPScrapeProcesslist(t *testing.T) {
 		// Forward-compatibility coverage
 		{"MySQL >=8 PS on -> perf_schema", "mysql:8", true, processlistPerfSchema},
 		{"MySQL >=9 PS on -> perf_schema", "mysql:9", true, processlistPerfSchema},
+		{"MySQL 9.7 PS on -> perf_schema", "mysql:9.7", true, processlistPerfSchema},
 		{"MySQL latest PS on -> perf_schema", "mysql:latest", true, processlistPerfSchema},
 	}
 

@@ -16,6 +16,7 @@ package collector
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -79,5 +80,87 @@ func TestScrapeInnodbMetrics(t *testing.T) {
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
+
+func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+	inst := &instance{db: db}
+
+	mock.ExpectQuery(sanitizeQuery(infoSchemaInnodbMetricsEnabledColumnQuery)).
+		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("STATUS"))
+
+	rows := sqlmock.NewRows([]string{"name", "subsystem", "type", "comment", "count"}).
+		AddRow("buffer_flush_neighbor", "buffer", "set_member", "Neighbor flush batches", 2).
+		AddRow("buffer_flush_neighbor_total_pages", "buffer", "set_owner", "Neighbor flush pages", 8).
+		AddRow("trx_rw_commits", "transaction", "status_counter", "Read-write commits", 3).
+		AddRow("log_lsn_checkpoint_age", "log", "counter", "Checkpoint age", 12)
+	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
+	mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if scrapeErr := (ScrapeInnodbMetrics{}).Scrape(t.Context(), inst, ch, promslog.NewNopLogger()); scrapeErr != nil {
+			t.Errorf("error calling function on test: %s", scrapeErr)
+		}
+	}()
+
+	type expectedMetric struct {
+		value      float64
+		metricType dto.MetricType
+	}
+	expected := map[string]expectedMetric{
+		"mysql_innodb_metrics_buffer_flush_neighbor_batches_total": {
+			value: 2, metricType: dto.MetricType_COUNTER,
+		},
+		"mysql_innodb_metrics_buffer_flush_neighbor_pages_total": {
+			value: 8, metricType: dto.MetricType_COUNTER,
+		},
+		"mysql_innodb_metrics_transactions_read_write_committed_total": {
+			value: 3, metricType: dto.MetricType_COUNTER,
+		},
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total": {
+			value: 2, metricType: dto.MetricType_COUNTER,
+		},
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total_pages": {
+			value: 8, metricType: dto.MetricType_COUNTER,
+		},
+		"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age": {
+			value: 12, metricType: dto.MetricType_GAUGE,
+		},
+		"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age_total": {
+			value: 12, metricType: dto.MetricType_COUNTER,
+		},
+	}
+	found := make(map[string]bool, len(expected))
+	for metric := range ch {
+		desc := metric.Desc().String()
+		for name, want := range expected {
+			if !strings.Contains(desc, `fqName: "`+name+`"`) {
+				continue
+			}
+			got := readMetric(metric)
+			if got.value != want.value {
+				t.Errorf("metric %s value = %v, want %v", name, got.value, want.value)
+			}
+			if got.metricType != want.metricType {
+				t.Errorf("metric %s type = %v, want %v", name, got.metricType, want.metricType)
+			}
+			found[name] = true
+		}
+	}
+	for name := range expected {
+		if !found[name] {
+			t.Errorf("stable metric %s was not collected", name)
+		}
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }

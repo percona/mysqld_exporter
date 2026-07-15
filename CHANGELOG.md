@@ -6,7 +6,7 @@ Changes:
 
 * [CHANGE]
 * [FEATURE]
-* [ENHANCEMENT]
+* [ENHANCEMENT] Add stable InnoDB redo metrics and normalize internal metric types for MySQL 9.7 compatibility.
 * [BUGFIX]
 
 ## 0.17.2 / 2025-02-25

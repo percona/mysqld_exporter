@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -65,6 +66,78 @@ var (
 		nil, nil,
 	)
 )
+
+type stableInnodbMetric struct {
+	name string
+	help string
+}
+
+// stableInnodbMetrics provides a version-independent API for metrics used by
+// dashboards. MySQL has changed the TYPE reported by INNODB_METRICS for some
+// counters, which changes whether the generic collector appends "_total".
+// Keep the generic metrics for compatibility and emit these stable aliases in
+// addition.
+var stableInnodbMetrics = map[string]stableInnodbMetric{
+	"buffer_flush_neighbor": {
+		name: "buffer_flush_neighbor_batches_total",
+		help: "Total number of neighbor page flush batches.",
+	},
+	"buffer_flush_neighbor_total_pages": {
+		name: "buffer_flush_neighbor_pages_total",
+		help: "Total number of pages flushed by neighbor page flushing.",
+	},
+	"purge_invoked": {
+		name: "purge_invocations_total",
+		help: "Total number of times purge was invoked.",
+	},
+	"purge_upd_exist_or_extern_records": {
+		name: "purge_updated_records_total",
+		help: "Total number of updated records processed by purge.",
+	},
+	"purge_del_mark_records": {
+		name: "purge_delete_marked_records_total",
+		help: "Total number of delete-marked records processed by purge.",
+	},
+	"trx_rw_commits": {
+		name: "transactions_read_write_committed_total",
+		help: "Total number of committed read-write transactions.",
+	},
+	"adaptive_hash_rows_added": {
+		name: "adaptive_hash_rows_added_total",
+		help: "Total number of rows added to the adaptive hash index.",
+	},
+	"adaptive_hash_rows_removed": {
+		name: "adaptive_hash_rows_removed_total",
+		help: "Total number of rows removed from the adaptive hash index.",
+	},
+	"adaptive_hash_rows_updated": {
+		name: "adaptive_hash_rows_updated_total",
+		help: "Total number of rows updated in the adaptive hash index.",
+	},
+	"adaptive_hash_pages_added": {
+		name: "adaptive_hash_pages_added_total",
+		help: "Total number of pages added to the adaptive hash index.",
+	},
+	"adaptive_hash_searches": {
+		name: "adaptive_hash_searches_total",
+		help: "Total number of adaptive hash index searches.",
+	},
+	"adaptive_hash_searches_btree": {
+		name: "adaptive_hash_btree_searches_total",
+		help: "Total number of B-tree searches that bypassed the adaptive hash index.",
+	},
+}
+
+// These values are positions or sizes rather than monotonically increasing
+// event counters. Some MySQL versions report them as counters, but dashboards
+// need their unsuffixed gauge names for max_over_time and direct arithmetic.
+var innodbMetricGaugeOverrides = map[string]struct{}{
+	"log/log_lsn_checkpoint_age":     {},
+	"log/log_lsn_current":            {},
+	"log/log_lsn_last_checkpoint":    {},
+	"log/log_lsn_last_flush":         {},
+	"log/log_max_modified_age_async": {},
+}
 
 // Regexp for matching metric aggregations.
 var (
@@ -127,6 +200,16 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 		); err != nil {
 			return err
 		}
+		if stable, ok := stableInnodbMetrics[name]; ok && value >= 0 {
+			ch <- prometheus.MustNewConstMetric(
+				prometheus.NewDesc(
+					prometheus.BuildFQName(namespace, "innodb_metrics", stable.name),
+					stable.help, nil, nil,
+				),
+				prometheus.CounterValue,
+				value,
+			)
+		}
 		// Special handling of the "buffer_page_io" subsystem.
 		if subsystem == "buffer_page_io" {
 			match := bufferPageRE.FindStringSubmatch(name)
@@ -171,25 +254,53 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 			}
 		}
 		metricName := "innodb_metrics_" + subsystem + "_" + name
-		// MySQL returns counters named two different ways. "counter" and "status_counter"
-		// value >= 0 is necessary due to upstream bugs: http://bugs.mysql.com/bug.php?id=75966
-		if (metricType == "counter" || metricType == "status_counter") && value >= 0 {
-			description := prometheus.NewDesc(
-				prometheus.BuildFQName(namespace, informationSchema, metricName+"_total"),
+		metricDesc := func(suffix string) *prometheus.Desc {
+			return prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, informationSchema, metricName+suffix),
 				comment, nil, nil,
 			)
+		}
+
+		if _, ok := innodbMetricGaugeOverrides[subsystem+"/"+name]; ok {
+			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
+			// Preserve the historical counter name for users that already query
+			// it while also exposing the correctly typed gauge above.
+			if (metricType == "counter" || metricType == "status_counter") && value >= 0 {
+				ch <- prometheus.MustNewConstMetric(metricDesc("_total"), prometheus.CounterValue, value)
+			}
+			continue
+		}
+
+		// MySQL returns counters as counter/status_counter and set aggregates as
+		// set_member/set_owner. A set_member needs the normal counter suffix,
+		// while set_owner names already carry their aggregate suffix.
+		if metricType == "set_member" && value >= 0 {
+			// Preserve the historical unsuffixed gauge and add the corrected
+			// counter so existing and current dashboards both keep working.
+			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
+			suffix := "_total"
+			if strings.HasSuffix(name, "_total") {
+				suffix = ""
+			}
+			ch <- prometheus.MustNewConstMetric(metricDesc(suffix), prometheus.CounterValue, value)
+			continue
+		}
+		if metricType == "set_owner" && value >= 0 {
+			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.CounterValue, value)
+			continue
+		}
+
+		// MySQL returns counters named two different ways. "counter" and "status_counter".
+		// value >= 0 is necessary due to upstream bugs: http://bugs.mysql.com/bug.php?id=75966
+		if (metricType == "counter" || metricType == "status_counter") && value >= 0 {
 			ch <- prometheus.MustNewConstMetric(
-				description,
+				metricDesc("_total"),
 				prometheus.CounterValue,
 				value,
 			)
 		} else {
-			description := prometheus.NewDesc(
-				prometheus.BuildFQName(namespace, informationSchema, metricName),
-				comment, nil, nil,
-			)
 			ch <- prometheus.MustNewConstMetric(
-				description,
+				metricDesc(""),
 				prometheus.GaugeValue,
 				value,
 			)
