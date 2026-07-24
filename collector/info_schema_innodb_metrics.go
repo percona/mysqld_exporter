@@ -283,10 +283,9 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 			continue
 		}
 
-		// MySQL returns counters as counter/status_counter and set aggregates as
-		// set_member/set_owner. A set_member needs the normal counter suffix,
-		// while set_owner names already carry their aggregate suffix.
-		if metricType == "set_member" && value >= 0 {
+		// Only known cumulative set members can safely be exposed as counters.
+		// Other set members include derived values that may decrease.
+		if _, ok := stableInnodbMetrics[name]; ok && metricType == "set_member" && value >= 0 {
 			// Preserve the historical unsuffixed gauge and add the corrected
 			// counter so existing and current dashboards both keep working.
 			if strings.HasSuffix(name, "_total") {

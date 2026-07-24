@@ -97,6 +97,7 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"name", "subsystem", "type", "comment", "count"}).
 		AddRow("buffer_flush_neighbor", "buffer", "set_member", "Neighbor flush batches", 2).
 		AddRow("buffer_flush_neighbor_total_pages", "buffer", "set_owner", "Neighbor flush pages", 8).
+		AddRow("buffer_flush_batch_scanned_per_call", "buffer", "set_member", "Pages scanned per flush batch", 4).
 		AddRow("trx_rw_commits", "transaction", "status_counter", "Read-write commits", 3).
 		AddRow("log_lsn_checkpoint_age", "log", "counter", "Checkpoint age", 12)
 	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
@@ -130,6 +131,9 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total_pages": {
 			value: 8, metricType: dto.MetricType_COUNTER,
 		},
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_scanned_per_call": {
+			value: 4, metricType: dto.MetricType_GAUGE,
+		},
 		"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age": {
 			value: 12, metricType: dto.MetricType_GAUGE,
 		},
@@ -140,6 +144,9 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 	found := make(map[string]bool, len(expected))
 	for metric := range ch {
 		desc := metric.Desc().String()
+		if strings.Contains(desc, `fqName: "mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_scanned_per_call_total"`) {
+			t.Error("derived set member must not be exported as a counter")
+		}
 		for name, want := range expected {
 			if !strings.Contains(desc, `fqName: "`+name+`"`) {
 				continue
