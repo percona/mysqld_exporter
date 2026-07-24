@@ -74,7 +74,7 @@ type innodbRedoStatus struct {
 	hasLegacyCurrent       bool
 	hasLegacyCheckpoint    bool
 	hasLegacyCheckpointAge bool
-	hasLegacyMaxAge        bool
+	hasCheckpointMaxAge    bool
 }
 
 func (s *innodbRedoStatus) observe(key string, value float64) {
@@ -102,14 +102,12 @@ func (s *innodbRedoStatus) observe(key string, value float64) {
 		s.hasCheckpointAge = true
 		s.hasLegacyCheckpointAge = true
 	case "innodb_checkpoint_max_age":
+		// This is a checkpoint flush threshold, not the total redo capacity.
+		// The original metric is emitted by the global status collector.
+		s.hasCheckpointMaxAge = true
+	case "innodb_redo_log_capacity_resized":
 		s.capacity = value
 		s.hasCapacity = true
-		s.hasLegacyMaxAge = true
-	case "innodb_redo_log_capacity_resized":
-		if !s.hasCapacity {
-			s.capacity = value
-			s.hasCapacity = true
-		}
 	case "innodb_os_log_written":
 		s.written = value
 		s.hasWritten = true
@@ -140,17 +138,12 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(innodbCheckpointAgeCompatDesc, prometheus.GaugeValue, s.checkpointAge)
 		}
 		if s.hasCapacity && s.capacity > 0 {
-			// Ratio is relative to the total redo log capacity. On Oracle
-			// MySQL capacity comes from innodb_redo_log_capacity_resized,
-			// whereas legacy Percona innodb_checkpoint_max_age is the sync
-			// flush threshold (a fraction of capacity), so the ratio scale
-			// may differ slightly between the two sources.
 			ch <- prometheus.MustNewConstMetric(innodbRedoUsageDesc, prometheus.GaugeValue, s.checkpointAge/s.capacity)
 		}
 	}
 	if s.hasCapacity {
 		ch <- prometheus.MustNewConstMetric(innodbRedoCapacityDesc, prometheus.GaugeValue, s.capacity)
-		if !s.hasLegacyMaxAge {
+		if !s.hasCheckpointMaxAge {
 			// Best-effort compatibility value: total redo capacity is used in
 			// place of the historical sync flush threshold.
 			ch <- prometheus.MustNewConstMetric(innodbCheckpointMaxAgeCompatDesc, prometheus.GaugeValue, s.capacity)

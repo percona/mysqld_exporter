@@ -92,5 +92,47 @@ func TestInnodbRedoStatusDoesNotDuplicatePerconaMetrics(t *testing.T) {
 		if strings.Contains(desc, "mysql_global_status_innodb_") {
 			t.Errorf("unexpected compatibility metric for Percona status variables: %s", desc)
 		}
+		if strings.Contains(desc, "mysql_innodb_redo_log_capacity_bytes") ||
+			strings.Contains(desc, "mysql_innodb_redo_log_checkpoint_age_ratio") {
+			t.Errorf("checkpoint max age must not be exported as redo capacity: %s", desc)
+		}
+	}
+}
+
+func TestInnodbRedoStatusKeepsCapacitySeparateFromCheckpointMaxAge(t *testing.T) {
+	status := innodbRedoStatus{}
+	status.observe("innodb_redo_log_current_lsn", 1500)
+	status.observe("innodb_redo_log_checkpoint_lsn", 1000)
+	status.observe("innodb_checkpoint_max_age", 1600)
+	status.observe("innodb_redo_log_capacity_resized", 2000)
+
+	ch := make(chan prometheus.Metric, 10)
+	status.collect(ch)
+	close(ch)
+
+	expected := map[string]float64{
+		"mysql_innodb_redo_log_capacity_bytes":       2000,
+		"mysql_innodb_redo_log_checkpoint_age_ratio": 0.25,
+	}
+	found := make(map[string]bool, len(expected))
+	for metric := range ch {
+		desc := metric.Desc().String()
+		if strings.Contains(desc, "mysql_global_status_innodb_checkpoint_max_age") {
+			t.Errorf("unexpected compatibility metric when checkpoint max age is present: %s", desc)
+		}
+		for name, want := range expected {
+			if !strings.Contains(desc, `fqName: "`+name+`"`) {
+				continue
+			}
+			if got := readMetric(metric).value; got != want {
+				t.Errorf("metric %s value = %v, want %v", name, got, want)
+			}
+			found[name] = true
+		}
+	}
+	for name := range expected {
+		if !found[name] {
+			t.Errorf("redo metric %s was not collected", name)
+		}
 	}
 }
