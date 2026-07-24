@@ -77,6 +77,10 @@ type stableInnodbMetric struct {
 // counters, which changes whether the generic collector appends "_total".
 // Keep the generic metrics for compatibility and emit these stable aliases in
 // addition.
+//
+// Every entry maps to a monotonically increasing counter, so the aliases are
+// always exported as CounterValue regardless of the TYPE MySQL reports for the
+// source row. Only add names here that are genuinely cumulative counters.
 var stableInnodbMetrics = map[string]stableInnodbMetric{
 	"buffer_flush_neighbor": {
 		name: "buffer_flush_neighbor_batches_total",

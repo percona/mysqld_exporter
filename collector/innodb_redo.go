@@ -140,12 +140,19 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(innodbCheckpointAgeCompatDesc, prometheus.GaugeValue, s.checkpointAge)
 		}
 		if s.hasCapacity && s.capacity > 0 {
+			// Ratio is relative to the total redo log capacity. On Oracle
+			// MySQL capacity comes from innodb_redo_log_capacity_resized,
+			// whereas legacy Percona innodb_checkpoint_max_age is the sync
+			// flush threshold (a fraction of capacity), so the ratio scale
+			// may differ slightly between the two sources.
 			ch <- prometheus.MustNewConstMetric(innodbRedoUsageDesc, prometheus.GaugeValue, s.checkpointAge/s.capacity)
 		}
 	}
 	if s.hasCapacity {
 		ch <- prometheus.MustNewConstMetric(innodbRedoCapacityDesc, prometheus.GaugeValue, s.capacity)
 		if !s.hasLegacyMaxAge {
+			// Best-effort compatibility value: total redo capacity is used in
+			// place of the historical sync flush threshold.
 			ch <- prometheus.MustNewConstMetric(innodbCheckpointMaxAgeCompatDesc, prometheus.GaugeValue, s.capacity)
 		}
 	}

@@ -6,7 +6,7 @@ Changes:
 
 * [CHANGE]
 * [FEATURE]
-* [ENHANCEMENT] Add stable InnoDB redo metrics and normalize internal metric types for MySQL 9.7 compatibility.
+* [ENHANCEMENT] Add stable, version-independent InnoDB redo log metrics (`mysql_innodb_redo_log_current_lsn`, `checkpoint_lsn`, `checkpoint_age_bytes`, `capacity_bytes`, `written_bytes_total`, `checkpoint_age_ratio`) with backward-compatible `mysql_global_status_innodb_*` aliases for MySQL 8.4/9.7, plus stable `mysql_innodb_metrics_*` aliases and corrected metric types for selected `INNODB_METRICS` counters and gauges.
 * [BUGFIX]
 
 ## 0.17.2 / 2025-02-25
