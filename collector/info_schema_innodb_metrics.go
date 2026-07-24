@@ -277,12 +277,13 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 		if metricType == "set_member" && value >= 0 {
 			// Preserve the historical unsuffixed gauge and add the corrected
 			// counter so existing and current dashboards both keep working.
-			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
-			suffix := "_total"
 			if strings.HasSuffix(name, "_total") {
-				suffix = ""
+				// Avoid exporting the same fqName as both a gauge and counter.
+				ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.CounterValue, value)
+				continue
 			}
-			ch <- prometheus.MustNewConstMetric(metricDesc(suffix), prometheus.CounterValue, value)
+			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
+			ch <- prometheus.MustNewConstMetric(metricDesc("_total"), prometheus.CounterValue, value)
 			continue
 		}
 		if metricType == "set_owner" && value >= 0 {
