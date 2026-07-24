@@ -64,6 +64,10 @@ func TestScrapePerfTableIOWaitsMySQLCompatibility(t *testing.T) {
 					t.Fatalf("scanning test rows: %v", err)
 				}
 			}
+			if err := rows.Err(); err != nil {
+				_ = rows.Close()
+				t.Fatalf("iterating test rows: %v", err)
+			}
 			if err := rows.Close(); err != nil {
 				t.Fatalf("closing test rows: %v", err)
 			}
