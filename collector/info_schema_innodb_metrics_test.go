@@ -164,3 +164,40 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+func TestScrapeInnodbMetricsGaugeOverrideSkipsNegative(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+	inst := &instance{db: db}
+
+	mock.ExpectQuery(sanitizeQuery(infoSchemaInnodbMetricsEnabledColumnQuery)).
+		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("STATUS"))
+
+	// The -1 sentinel is reported by some MySQL versions due to an upstream
+	// INNODB_METRICS bug and must not be exported for gauge-override metrics.
+	rows := sqlmock.NewRows([]string{"name", "subsystem", "type", "comment", "count"}).
+		AddRow("log_lsn_checkpoint_age", "log", "counter", "Checkpoint age", -1)
+	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
+	mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if scrapeErr := (ScrapeInnodbMetrics{}).Scrape(t.Context(), inst, ch, promslog.NewNopLogger()); scrapeErr != nil {
+			t.Errorf("error calling function on test: %s", scrapeErr)
+		}
+	}()
+
+	for metric := range ch {
+		if strings.Contains(metric.Desc().String(), "log_lsn_checkpoint_age") {
+			t.Errorf("negative override metric should be skipped, got: %s", metric.Desc())
+		}
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}

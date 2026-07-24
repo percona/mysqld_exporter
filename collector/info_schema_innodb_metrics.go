@@ -266,10 +266,18 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 		}
 
 		if _, ok := innodbMetricGaugeOverrides[subsystem+"/"+name]; ok {
+			isCounter := metricType == "counter" || metricType == "status_counter"
+			// Some MySQL versions report these overridden metrics as counters
+			// and can emit the -1 sentinel due to an upstream bug
+			// (http://bugs.mysql.com/bug.php?id=75966). A negative value is not
+			// a valid sample for either the gauge or the counter, so skip it.
+			if isCounter && value < 0 {
+				continue
+			}
 			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
 			// Preserve the historical counter name for users that already query
 			// it while also exposing the correctly typed gauge above.
-			if (metricType == "counter" || metricType == "status_counter") && value >= 0 {
+			if isCounter {
 				ch <- prometheus.MustNewConstMetric(metricDesc("_total"), prometheus.CounterValue, value)
 			}
 			continue
