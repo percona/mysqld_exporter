@@ -98,8 +98,10 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		AddRow("buffer_flush_neighbor", "buffer", "set_member", "Neighbor flush batches", 2).
 		AddRow("buffer_flush_neighbor_total_pages", "buffer", "set_owner", "Neighbor flush pages", 8).
 		AddRow("buffer_flush_batch_scanned_per_call", "buffer", "set_member", "Pages scanned per flush batch", 4).
+		AddRow("buffer_flush_batch_total_pages", "buffer", "set_owner", "Pages flushed by batches", 6).
 		AddRow("trx_rw_commits", "transaction", "status_counter", "Read-write commits", 3).
-		AddRow("log_lsn_checkpoint_age", "log", "counter", "Checkpoint age", 12)
+		AddRow("log_lsn_checkpoint_age", "log", "counter", "Checkpoint age", 12).
+		AddRow("log_lsn_checkpoint_age", "recovery", "counter", "Checkpoint age", 14)
 	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
 	mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(rows)
 
@@ -129,10 +131,16 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 			value: 2, metricType: dto.MetricType_COUNTER,
 		},
 		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total_pages": {
+			value: 8, metricType: dto.MetricType_GAUGE,
+		},
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total_pages_total": {
 			value: 8, metricType: dto.MetricType_COUNTER,
 		},
 		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_scanned_per_call": {
 			value: 4, metricType: dto.MetricType_GAUGE,
+		},
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_total_pages": {
+			value: 6, metricType: dto.MetricType_GAUGE,
 		},
 		"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age": {
 			value: 12, metricType: dto.MetricType_GAUGE,
@@ -140,12 +148,27 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age_total": {
 			value: 12, metricType: dto.MetricType_COUNTER,
 		},
+		"mysql_info_schema_innodb_metrics_recovery_log_lsn_checkpoint_age": {
+			value: 14, metricType: dto.MetricType_GAUGE,
+		},
+		"mysql_info_schema_innodb_metrics_recovery_log_lsn_checkpoint_age_total": {
+			value: 14, metricType: dto.MetricType_COUNTER,
+		},
+	}
+	unexpected := []string{
+		// Derived set members must not be exported as counters.
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_scanned_per_call_total",
+		// Set owners outside stableInnodbMetrics must keep their historical
+		// gauge type instead of silently turning into counters.
+		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_total_pages_total",
 	}
 	found := make(map[string]bool, len(expected))
 	for metric := range ch {
 		desc := metric.Desc().String()
-		if strings.Contains(desc, `fqName: "mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_scanned_per_call_total"`) {
-			t.Error("derived set member must not be exported as a counter")
+		for _, name := range unexpected {
+			if strings.Contains(desc, `fqName: "`+name+`"`) {
+				t.Errorf("metric %s must not be exported", name)
+			}
 		}
 		for name, want := range expected {
 			if !strings.Contains(desc, `fqName: "`+name+`"`) {

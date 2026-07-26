@@ -21,16 +21,28 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+// collectRedoStatus drains collect() through an unbuffered channel so that the
+// tests cannot deadlock when the number of emitted metrics changes.
+func collectRedoStatus(status *innodbRedoStatus) []prometheus.Metric {
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		status.collect(ch)
+	}()
+
+	var metrics []prometheus.Metric
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
+	return metrics
+}
+
 func TestInnodbRedoStatusMySQL97(t *testing.T) {
 	status := innodbRedoStatus{}
 	status.observe("innodb_redo_log_current_lsn", 1500)
 	status.observe("innodb_redo_log_checkpoint_lsn", 1000)
 	status.observe("innodb_redo_log_capacity_resized", 2000)
 	status.observe("innodb_os_log_written", 4096)
-
-	ch := make(chan prometheus.Metric, 10)
-	status.collect(ch)
-	close(ch)
 
 	type expectedMetric struct {
 		value      float64
@@ -50,7 +62,7 @@ func TestInnodbRedoStatusMySQL97(t *testing.T) {
 	}
 
 	found := make(map[string]bool, len(expected))
-	for metric := range ch {
+	for _, metric := range collectRedoStatus(&status) {
 		desc := metric.Desc().String()
 		for name, want := range expected {
 			if !strings.Contains(desc, `fqName: "`+name+`"`) {
@@ -83,11 +95,7 @@ func TestInnodbRedoStatusDoesNotDuplicatePerconaMetrics(t *testing.T) {
 	status.observe("innodb_checkpoint_age", 500)
 	status.observe("innodb_checkpoint_max_age", 2000)
 
-	ch := make(chan prometheus.Metric, 5)
-	status.collect(ch)
-	close(ch)
-
-	for metric := range ch {
+	for _, metric := range collectRedoStatus(&status) {
 		desc := metric.Desc().String()
 		if strings.Contains(desc, "mysql_global_status_innodb_") {
 			t.Errorf("unexpected compatibility metric for Percona status variables: %s", desc)
@@ -106,16 +114,12 @@ func TestInnodbRedoStatusKeepsCapacitySeparateFromCheckpointMaxAge(t *testing.T)
 	status.observe("innodb_checkpoint_max_age", 1600)
 	status.observe("innodb_redo_log_capacity_resized", 2000)
 
-	ch := make(chan prometheus.Metric, 10)
-	status.collect(ch)
-	close(ch)
-
 	expected := map[string]float64{
 		"mysql_innodb_redo_log_capacity_bytes":       2000,
 		"mysql_innodb_redo_log_checkpoint_age_ratio": 0.25,
 	}
 	found := make(map[string]bool, len(expected))
-	for metric := range ch {
+	for _, metric := range collectRedoStatus(&status) {
 		desc := metric.Desc().String()
 		if strings.Contains(desc, "mysql_global_status_innodb_checkpoint_max_age") {
 			t.Errorf("unexpected compatibility metric when checkpoint max age is present: %s", desc)

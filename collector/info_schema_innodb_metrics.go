@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -81,6 +80,10 @@ type stableInnodbMetric struct {
 // Every entry maps to a monotonically increasing counter, so the aliases are
 // always exported as CounterValue regardless of the TYPE MySQL reports for the
 // source row. Only add names here that are genuinely cumulative counters.
+//
+// Entries also make the generic collector emit a "<name>_total" counter next to
+// the historical gauge, so do not add a name whose subsystem already contains a
+// row literally called "<name>_total": the two would collide on one fqName.
 var stableInnodbMetrics = map[string]stableInnodbMetric{
 	"buffer_flush_neighbor": {
 		name: "buffer_flush_neighbor_batches_total",
@@ -135,12 +138,20 @@ var stableInnodbMetrics = map[string]stableInnodbMetric{
 // These values are positions or sizes rather than monotonically increasing
 // event counters. Some MySQL versions report them as counters, but dashboards
 // need their unsuffixed gauge names for max_over_time and direct arithmetic.
+// MySQL reports these rows under the "log" subsystem, older versions under
+// "recovery". Both spellings are queried by the dashboards, so both need the
+// override.
 var innodbMetricGaugeOverrides = map[string]struct{}{
-	"log/log_lsn_checkpoint_age":     {},
-	"log/log_lsn_current":            {},
-	"log/log_lsn_last_checkpoint":    {},
-	"log/log_lsn_last_flush":         {},
-	"log/log_max_modified_age_async": {},
+	"log/log_lsn_checkpoint_age":          {},
+	"log/log_lsn_current":                 {},
+	"log/log_lsn_last_checkpoint":         {},
+	"log/log_lsn_last_flush":              {},
+	"log/log_max_modified_age_async":      {},
+	"recovery/log_lsn_checkpoint_age":     {},
+	"recovery/log_lsn_current":            {},
+	"recovery/log_lsn_last_checkpoint":    {},
+	"recovery/log_lsn_last_flush":         {},
+	"recovery/log_max_modified_age_async": {},
 }
 
 // Regexp for matching metric aggregations.
@@ -283,22 +294,16 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 			continue
 		}
 
-		// Only known cumulative set members can safely be exposed as counters.
-		// Other set members include derived values that may decrease.
-		if _, ok := stableInnodbMetrics[name]; ok && metricType == "set_member" && value >= 0 {
-			// Preserve the historical unsuffixed gauge and add the corrected
-			// counter so existing and current dashboards both keep working.
-			if strings.HasSuffix(name, "_total") {
-				// Avoid exporting the same fqName as both a gauge and counter.
-				ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.CounterValue, value)
-				continue
-			}
+		// Only the known cumulative rows listed in stableInnodbMetrics can
+		// safely be exposed as counters. Other set rows hold derived values
+		// such as averages or per-call figures that may decrease.
+		isSetRow := metricType == "set_member" || metricType == "set_owner"
+		if _, ok := stableInnodbMetrics[name]; ok && isSetRow && value >= 0 {
+			// Both row types were historically exported as an unsuffixed
+			// gauge. Preserve that name and add the correctly typed counter so
+			// existing and current dashboards both keep working.
 			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.GaugeValue, value)
 			ch <- prometheus.MustNewConstMetric(metricDesc("_total"), prometheus.CounterValue, value)
-			continue
-		}
-		if metricType == "set_owner" && value >= 0 {
-			ch <- prometheus.MustNewConstMetric(metricDesc(""), prometheus.CounterValue, value)
 			continue
 		}
 
