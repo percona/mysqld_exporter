@@ -11,33 +11,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build integration
-
 package collector
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
 	"testing"
 
-	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/promslog"
 )
 
-// TestScrapeAutoIncrementColumnsMaxValue evaluates the max_int expression on a
-// real server. ZEROFILL appends another attribute after "unsigned" in
-// column_type, which an anchored LIKE '% unsigned' misses, so those columns used
-// to report the signed maximum and looked twice as full as they were.
+// TestScrapeAutoIncrementColumnsMaxValue evaluates the max_int expression on the
+// server started by docker-compose, so every flavor of the CI matrix checks it.
+// ZEROFILL appends another attribute after "unsigned" in column_type, which an
+// anchored LIKE '% unsigned' misses: such columns reported the signed maximum
+// and so looked twice as full as they were.
 func TestScrapeAutoIncrementColumnsMaxValue(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping testcontainers integration test in -short mode")
-	}
-	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
-		t.Fatal(err)
+		t.Skip("-short is passed, skipping test")
 	}
 
-	tables := []struct {
+	db, err := sql.Open("mysql", "root@tcp(127.0.0.1:3306)/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	const dbName = "test_auto_increment_db"
+
+	if _, err := db.Exec("CREATE DATABASE IF NOT EXISTS " + dbName); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.Exec("DROP DATABASE " + dbName); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	cases := []struct {
 		name    string
 		column  string
 		wantMax float64
@@ -50,37 +63,28 @@ func TestScrapeAutoIncrementColumnsMaxValue(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	// ZEROFILL is deprecated since 8.0.17, so pin a version that still accepts it.
-	dsn := startContainerForCase(t, ctx, "mysql:8.0", true)
 
-	db, _ := openRecordingDB(t, dsn)
-	t.Cleanup(func() { _ = db.Close() })
-
-	for _, table := range tables {
-		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (id %s, PRIMARY KEY (id))", table.name, table.column)); err != nil {
-			t.Fatalf("creating table %s: %v", table.name, err)
+	for _, c := range cases {
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s.%s (id %s, PRIMARY KEY (id))", dbName, c.name, c.column)); err != nil {
+			t.Fatalf("creating table %s: %v", c.name, err)
 		}
+
 		// The scraper skips tables whose information_schema.tables.auto_increment
 		// is NULL, which is what a never-used counter reports. ANALYZE TABLE then
 		// refreshes the value the dictionary cache would otherwise serve for
 		// information_schema_stats_expiry seconds.
-		if _, err := db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s () VALUES ()", table.name)); err != nil {
-			t.Fatalf("seeding table %s: %v", table.name, err)
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s.%s () VALUES ()", dbName, c.name)); err != nil {
+			t.Fatalf("seeding table %s: %v", c.name, err)
 		}
-		if _, err := db.ExecContext(ctx, fmt.Sprintf("ANALYZE TABLE %s", table.name)); err != nil {
-			t.Fatalf("analyzing table %s: %v", table.name, err)
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("ANALYZE TABLE %s.%s", dbName, c.name)); err != nil {
+			t.Fatalf("analyzing table %s: %v", c.name, err)
 		}
-	}
-
-	instance, err := newInstanceFromDB(ctx, db)
-	if err != nil {
-		t.Fatalf("failed to create new instance: %v", err)
 	}
 
 	ch := make(chan prometheus.Metric)
 	scrapeErr := make(chan error, 1)
 	go func() {
-		scrapeErr <- (ScrapeAutoIncrementColumns{}).Scrape(ctx, instance, ch, promslog.NewNopLogger())
+		scrapeErr <- (ScrapeAutoIncrementColumns{}).Scrape(ctx, &instance{db: db}, ch, promslog.NewNopLogger())
 		close(ch)
 	}()
 
@@ -90,7 +94,7 @@ func TestScrapeAutoIncrementColumnsMaxValue(t *testing.T) {
 			continue
 		}
 		result := readMetric(metric)
-		if result.labels["schema"] != "test" {
+		if result.labels["schema"] != dbName {
 			continue
 		}
 		got[result.labels["table"]] = result.value
@@ -99,14 +103,14 @@ func TestScrapeAutoIncrementColumnsMaxValue(t *testing.T) {
 		t.Fatalf("scrape failed: %v", err)
 	}
 
-	for _, table := range tables {
-		gotMax, ok := got[table.name]
+	for _, c := range cases {
+		gotMax, ok := got[c.name]
 		if !ok {
-			t.Errorf("no max metric for table %s; collected: %v", table.name, got)
+			t.Errorf("no max metric for table %s; collected: %v", c.name, got)
 			continue
 		}
-		if gotMax != table.wantMax {
-			t.Errorf("table %s (%s): max = %.0f, want %.0f", table.name, table.column, gotMax, table.wantMax)
+		if gotMax != c.wantMax {
+			t.Errorf("table %s (%s): max = %.0f, want %.0f", c.name, c.column, gotMax, c.wantMax)
 		}
 	}
 }
