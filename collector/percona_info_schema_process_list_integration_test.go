@@ -106,7 +106,15 @@ func startContainerForCase(t *testing.T, ctx context.Context, image string, psEn
 	if psEnabled {
 		psFlag = "ON"
 	}
-	cmdArg := fmt.Sprintf("--performance-schema=%s", psFlag)
+	// Ten of these containers come up in parallel and each server would otherwise
+	// size its buffer pool from total host memory. Pin it small so the suite fits
+	// on a developer machine and does not thrash a CI runner; the processlist
+	// source selection under test does not depend on it. innodb_buffer_pool_size
+	// is the one knob MySQL 5.7, 8.x, 9.x and MariaDB all accept.
+	cmdArgs := []string{
+		fmt.Sprintf("--performance-schema=%s", psFlag),
+		"--innodb-buffer-pool-size=64M",
+	}
 
 	switch {
 	case strings.HasPrefix(image, "mariadb:"):
@@ -114,7 +122,7 @@ func startContainerForCase(t *testing.T, ctx context.Context, image string, psEn
 			tcmariadb.WithDatabase("test"),
 			tcmariadb.WithUsername("test"),
 			tcmariadb.WithPassword("test"),
-			testcontainers.WithCmdArgs(cmdArg),
+			testcontainers.WithCmdArgs(cmdArgs...),
 		)
 		if err != nil {
 			t.Fatalf("starting %s: %v", image, err)
@@ -133,7 +141,7 @@ func startContainerForCase(t *testing.T, ctx context.Context, image string, psEn
 			tcmysql.WithDatabase("test"),
 			tcmysql.WithUsername("test"),
 			tcmysql.WithPassword("test"),
-			testcontainers.WithCmdArgs(cmdArg),
+			testcontainers.WithCmdArgs(cmdArgs...),
 		)
 		if err != nil {
 			t.Fatalf("starting %s: %v", image, err)

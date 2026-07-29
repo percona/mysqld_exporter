@@ -27,6 +27,10 @@ import (
 )
 
 func TestScrapePerfTableIOWaitsMySQLCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testcontainers integration test in -short mode")
+	}
+
 	cases := []struct {
 		name  string
 		image string
@@ -94,7 +98,15 @@ func startPerfTableIOContainer(t *testing.T, ctx context.Context, image string) 
 		tcmysql.WithDatabase("test"),
 		tcmysql.WithUsername("root"),
 		tcmysql.WithPassword("test"),
-		testcontainers.WithCmdArgs("--performance-schema=ON"),
+		// MySQL 9.7 autosizes InnoDB from host memory and gets OOM killed on a
+		// Docker VM that is already busy, where 8.0 still fits. The counters
+		// under test do not depend on either size, so pin both low enough that
+		// the test runs on a developer machine as well as in CI.
+		testcontainers.WithCmdArgs(
+			"--performance-schema=ON",
+			"--innodb-buffer-pool-size=64M",
+			"--innodb-redo-log-capacity=16M",
+		),
 	)
 	if err != nil {
 		t.Fatalf("starting %s: %v", image, err)
