@@ -63,3 +63,40 @@ jobs:
           git status
           docker version
           docker compose version
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ github.workspace }}/go.mod
+
+      # Kept out of the matrix above on purpose: the integration tests pin the
+      # server images they need and start them through testcontainers, so running
+      # them per matrix entry would start the same containers fourteen times over.
+
+      # Nothing built these files before, so a compile error in an integration
+      # test could not fail the build.
+      - name: Compile-check integration tests
+        run: make test-integration-build
+
+      # Only the table I/O waits test runs for now. TestPScrapeProcesslist brings
+      # up ten database containers in parallel, each server sizing InnoDB from
+      # total host memory, and that has not been validated on a hosted runner.
+      # Widen this to `make test-integration` once it has.
+      - name: Run integration tests
+        run: go test -count 1 -race -tags integration -run TestScrapePerfTableIOWaits ./collector/
+
+      - name: Run debug commands on failure
+        if: ${{ failure() }}
+        run: |
+          env | sort
+          go env | sort
+          docker version
+          free -m

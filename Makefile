@@ -58,6 +58,19 @@ test:             ## Run all tests
 	@echo ">> running tests"
 	@$(GO) test -count 1 -race $(pkgs)
 
+# Tests behind the integration build tag start their own database containers via
+# testcontainers and pin the images they need, so they ignore MYSQL_IMAGE and must
+# not be run once per entry of the CI matrix.
+test-integration-build: ## Compile-check the tests behind the integration build tag
+	@echo ">> compile-checking integration tests"
+	@$(GO) vet -tags integration $(pkgs)
+
+# Needs a Docker host with room for ten parallel database containers. CI runs a
+# subset instead, see the integration job in .github/workflows/go.yml.
+test-integration: ## Run all tests, including those behind the integration build tag
+	@echo ">> running integration tests"
+	@$(GO) test -count 1 -race -tags integration $(pkgs)
+
 FILES = $(shell find . -type f -name '*.go')
 
 format:           ## Format the code
@@ -111,4 +124,4 @@ release:          ## Build release binary
 # 	docker exec -t --user root pmm-server chown pmm:pmm /usr/local/percona/pmm/exporters/mysqld_exporter
 # 	docker exec -t pmm-server supervisorctl start pmm-agent
 
-.PHONY: all init style format build test vet tarball docker env-up env-down help default
+.PHONY: all init style format build test test-integration test-integration-build vet tarball docker env-up env-down help default
