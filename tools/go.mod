@@ -6,8 +6,8 @@ require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/prometheus/promu v0.20.0
 	github.com/reviewdog/reviewdog v0.21.0
-	golang.org/x/tools v0.48.0
-	mvdan.cc/gofumpt v0.10.0
+	golang.org/x/tools v0.49.0
+	mvdan.cc/gofumpt v0.11.0
 )
 
 require (
@@ -153,7 +153,7 @@ require (
 	github.com/reviewdog/errorformat v0.0.0-20250320004447-223c26dbe212 // indirect
 	github.com/reviewdog/go-bitbucket v0.0.0-20201024094602-708c3f6a7de0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/ryancurrah/gomodguard v1.3.5 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.5.1 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.1.0 // indirect
@@ -204,11 +204,11 @@ require (
 	golang.org/x/build v0.0.0-20250902193327-e6a76329f415 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
-	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/mod v0.39.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260708182218-49f421fb7959 // indirect
+	golang.org/x/telemetry v0.0.0-20260811182544-a038080d80e5 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
