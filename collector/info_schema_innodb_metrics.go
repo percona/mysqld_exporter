@@ -72,10 +72,16 @@ type stableInnodbMetric struct {
 }
 
 // stableInnodbMetrics provides a version-independent API for metrics used by
-// dashboards. MySQL has changed the TYPE reported by INNODB_METRICS for some
-// counters, which changes whether the generic collector appends "_total".
-// Keep the generic metrics for compatibility and emit these stable aliases in
-// addition.
+// dashboards. The generic name this collector derives from INNODB_METRICS
+// depends on the row's SUBSYSTEM and on whether its TYPE makes the collector
+// append "_total", and both have moved between server versions: 5.7 reports the
+// redo rows under "recovery" with log_lsn_checkpoint_age as a counter, while 8.0
+// and newer report them under "log" as values. Keep the generic metrics for
+// compatibility and emit these stable aliases in addition.
+//
+// Keyed by "<subsystem>/<name>" so that an alias cannot be emitted twice should
+// a future release report one of these names under a second subsystem: two
+// identical fqNames make Gather() drop the whole metric family.
 //
 // Every entry maps to a monotonically increasing counter, so the aliases are
 // always exported as CounterValue regardless of the TYPE MySQL reports for the
@@ -85,62 +91,66 @@ type stableInnodbMetric struct {
 // the historical gauge, so do not add a name whose subsystem already contains a
 // row literally called "<name>_total": the two would collide on one fqName.
 var stableInnodbMetrics = map[string]stableInnodbMetric{
-	"buffer_flush_neighbor": {
+	"buffer/buffer_flush_neighbor": {
 		name: "buffer_flush_neighbor_batches_total",
 		help: "Total number of neighbor page flush batches.",
 	},
-	"buffer_flush_neighbor_total_pages": {
+	"buffer/buffer_flush_neighbor_total_pages": {
 		name: "buffer_flush_neighbor_pages_total",
 		help: "Total number of pages flushed by neighbor page flushing.",
 	},
-	"purge_invoked": {
+	"purge/purge_invoked": {
 		name: "purge_invocations_total",
 		help: "Total number of times purge was invoked.",
 	},
-	"purge_upd_exist_or_extern_records": {
+	"purge/purge_upd_exist_or_extern_records": {
 		name: "purge_updated_records_total",
 		help: "Total number of updated records processed by purge.",
 	},
-	"purge_del_mark_records": {
+	"purge/purge_del_mark_records": {
 		name: "purge_delete_marked_records_total",
 		help: "Total number of delete-marked records processed by purge.",
 	},
-	"trx_rw_commits": {
+	"transaction/trx_rw_commits": {
 		name: "transactions_read_write_committed_total",
 		help: "Total number of committed read-write transactions.",
 	},
-	"adaptive_hash_rows_added": {
+	"adaptive_hash_index/adaptive_hash_rows_added": {
 		name: "adaptive_hash_rows_added_total",
 		help: "Total number of rows added to the adaptive hash index.",
 	},
-	"adaptive_hash_rows_removed": {
+	"adaptive_hash_index/adaptive_hash_rows_removed": {
 		name: "adaptive_hash_rows_removed_total",
 		help: "Total number of rows removed from the adaptive hash index.",
 	},
-	"adaptive_hash_rows_updated": {
+	"adaptive_hash_index/adaptive_hash_rows_updated": {
 		name: "adaptive_hash_rows_updated_total",
 		help: "Total number of rows updated in the adaptive hash index.",
 	},
-	"adaptive_hash_pages_added": {
+	"adaptive_hash_index/adaptive_hash_pages_added": {
 		name: "adaptive_hash_pages_added_total",
 		help: "Total number of pages added to the adaptive hash index.",
 	},
-	"adaptive_hash_searches": {
+	"adaptive_hash_index/adaptive_hash_searches": {
 		name: "adaptive_hash_searches_total",
 		help: "Total number of adaptive hash index searches.",
 	},
-	"adaptive_hash_searches_btree": {
+	"adaptive_hash_index/adaptive_hash_searches_btree": {
 		name: "adaptive_hash_btree_searches_total",
 		help: "Total number of B-tree searches that bypassed the adaptive hash index.",
 	},
 }
 
 // These values are positions or sizes rather than monotonically increasing
-// event counters. Some MySQL versions report them as counters, but dashboards
-// need their unsuffixed gauge names for max_over_time and direct arithmetic.
-// MySQL reports these rows under the "log" subsystem, older versions under
-// "recovery". Both spellings are queried by the dashboards, so both need the
-// override.
+// event counters, but the TYPE reported for them is not stable across versions:
+// 5.7 reports them under "recovery" with log_lsn_checkpoint_age as a counter,
+// while 8.0, 8.4, 9.7 and Percona Server 8.0 report all five under "log" as
+// values. The override is therefore a guard, not a description of current
+// server behaviour: on 8.0 and newer it emits exactly what the generic branch
+// below would. It keeps the unsuffixed gauge that dashboards need for
+// max_over_time and direct arithmetic even if a release flips one of these rows
+// to a counter. Dashboards query both the "log" and the "recovery" spelling, so
+// both are listed.
 var innodbMetricGaugeOverrides = map[string]struct{}{
 	"log/log_lsn_checkpoint_age":          {},
 	"log/log_lsn_current":                 {},
@@ -215,7 +225,8 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 		); err != nil {
 			return err
 		}
-		if stable, ok := stableInnodbMetrics[name]; ok && value >= 0 {
+		metricKey := subsystem + "/" + name
+		if stable, ok := stableInnodbMetrics[metricKey]; ok && value >= 0 {
 			ch <- prometheus.MustNewConstMetric(
 				prometheus.NewDesc(
 					prometheus.BuildFQName(namespace, "innodb_metrics", stable.name),
@@ -276,7 +287,7 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 			)
 		}
 
-		if _, ok := innodbMetricGaugeOverrides[subsystem+"/"+name]; ok {
+		if _, ok := innodbMetricGaugeOverrides[metricKey]; ok {
 			isCounter := metricType == "counter" || metricType == "status_counter"
 			// Some MySQL versions report these overridden metrics as counters
 			// and can emit the -1 sentinel due to an upstream bug
@@ -298,7 +309,7 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 		// safely be exposed as counters. Other set rows hold derived values
 		// such as averages or per-call figures that may decrease.
 		isSetRow := metricType == "set_member" || metricType == "set_owner"
-		if _, ok := stableInnodbMetrics[name]; ok && isSetRow && value >= 0 {
+		if _, ok := stableInnodbMetrics[metricKey]; ok && isSetRow && value >= 0 {
 			// Both row types were historically exported as an unsuffixed
 			// gauge. Preserve that name and add the correctly typed counter so
 			// existing and current dashboards both keep working.

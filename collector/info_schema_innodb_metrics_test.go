@@ -231,3 +231,204 @@ func TestScrapeInnodbMetricsGaugeOverrideSkipsNegative(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+// scraperCollector adapts a Scraper to prometheus.Collector so that a test can
+// gather through a registry. Two metrics sharing an fqName, or one fqName
+// exported as both a gauge and a counter, are only detected by Gather(), and a
+// single occurrence costs the whole metric family on the endpoint.
+type scraperCollector struct {
+	t       *testing.T
+	ctx     context.Context
+	scraper Scraper
+	inst    *instance
+}
+
+func (c scraperCollector) Describe(chan<- *prometheus.Desc) {}
+
+func (c scraperCollector) Collect(ch chan<- prometheus.Metric) {
+	if err := c.scraper.Scrape(c.ctx, c.inst, ch, promslog.NewNopLogger()); err != nil {
+		c.t.Errorf("error calling function on test: %s", err)
+	}
+}
+
+func TestScrapeInnodbMetricsGathersThroughRegistry(t *testing.T) {
+	columns := []string{"name", "subsystem", "type", "comment", "count"}
+	cases := []struct {
+		name     string
+		rows     func() *sqlmock.Rows
+		expected []string
+	}{
+		{
+			// Subsystems and types as reported by MySQL 8.0, 8.4, 9.7 and
+			// Percona Server 8.0.
+			name: "MySQL 8.0 and newer",
+			rows: func() *sqlmock.Rows {
+				return sqlmock.NewRows(columns).
+					AddRow("buffer_flush_neighbor", "buffer", "set_member", "Neighbor flush batches", 2).
+					AddRow("buffer_flush_neighbor_total_pages", "buffer", "set_owner", "Neighbor flush pages", 8).
+					AddRow("purge_invoked", "purge", "counter", "Purge invocations", 5).
+					AddRow("trx_rw_commits", "transaction", "counter", "Read-write commits", 3).
+					AddRow("adaptive_hash_searches", "adaptive_hash_index", "status_counter", "AHI searches", 7).
+					AddRow("log_lsn_checkpoint_age", "log", "value", "Checkpoint age", 12).
+					AddRow("log_lsn_current", "log", "value", "Current LSN", 99)
+			},
+			expected: []string{
+				"mysql_innodb_metrics_buffer_flush_neighbor_batches_total",
+				"mysql_innodb_metrics_buffer_flush_neighbor_pages_total",
+				"mysql_innodb_metrics_purge_invocations_total",
+				"mysql_innodb_metrics_transactions_read_write_committed_total",
+				"mysql_innodb_metrics_adaptive_hash_searches_total",
+				"mysql_info_schema_innodb_metrics_log_log_lsn_checkpoint_age",
+			},
+		},
+		{
+			// MySQL 5.7 keeps the redo rows under "recovery" and reports
+			// log_lsn_checkpoint_age as a counter.
+			name: "MySQL 5.7",
+			rows: func() *sqlmock.Rows {
+				return sqlmock.NewRows(columns).
+					AddRow("buffer_flush_neighbor", "buffer", "set_member", "Neighbor flush batches", 2).
+					AddRow("purge_invoked", "purge", "counter", "Purge invocations", 5).
+					AddRow("trx_rw_commits", "transaction", "counter", "Read-write commits", 3).
+					AddRow("log_lsn_checkpoint_age", "recovery", "counter", "Checkpoint age", 12).
+					AddRow("log_lsn_current", "recovery", "value", "Current LSN", 99)
+			},
+			expected: []string{
+				"mysql_innodb_metrics_buffer_flush_neighbor_batches_total",
+				"mysql_innodb_metrics_purge_invocations_total",
+				"mysql_info_schema_innodb_metrics_recovery_log_lsn_checkpoint_age",
+				"mysql_info_schema_innodb_metrics_recovery_log_lsn_checkpoint_age_total",
+			},
+		},
+		{
+			// A synthetic layout standing in for a future release that reuses
+			// one of the alias source names under a second subsystem. Keying
+			// stableInnodbMetrics by subsystem is what keeps this from emitting
+			// mysql_innodb_metrics_purge_invocations_total twice, which would
+			// fail Gather() and drop the family from the endpoint.
+			name: "one name under two subsystems",
+			rows: func() *sqlmock.Rows {
+				return sqlmock.NewRows(columns).
+					AddRow("purge_invoked", "purge", "counter", "Purge invocations", 5).
+					AddRow("purge_invoked", "purge_extra", "counter", "Purge invocations", 7)
+			},
+			expected: []string{
+				"mysql_innodb_metrics_purge_invocations_total",
+				"mysql_info_schema_innodb_metrics_purge_purge_invoked_total",
+				"mysql_info_schema_innodb_metrics_purge_extra_purge_invoked_total",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("error opening a stub database connection: %s", err)
+			}
+			defer db.Close()
+
+			mock.ExpectQuery(sanitizeQuery(infoSchemaInnodbMetricsEnabledColumnQuery)).
+				WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("STATUS"))
+			query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
+			mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(tc.rows())
+
+			registry := prometheus.NewRegistry()
+			registry.MustRegister(scraperCollector{
+				t:       t,
+				ctx:     t.Context(),
+				scraper: ScrapeInnodbMetrics{},
+				inst:    &instance{db: db},
+			})
+
+			families, err := registry.Gather()
+			if err != nil {
+				t.Fatalf("gathering innodb_metrics: %v", err)
+			}
+
+			exported := make(map[string]bool, len(families))
+			for _, family := range families {
+				exported[family.GetName()] = true
+			}
+			for _, name := range tc.expected {
+				if !exported[name] {
+					t.Errorf("metric family %s was not exported", name)
+				}
+			}
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("there were unfulfilled expectations: %s", err)
+			}
+		})
+	}
+}
+
+func TestScrapeInnodbMetricsStableAliasSkipsNegative(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(sanitizeQuery(infoSchemaInnodbMetricsEnabledColumnQuery)).
+		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("STATUS"))
+	rows := sqlmock.NewRows([]string{"name", "subsystem", "type", "comment", "count"}).
+		AddRow("purge_invoked", "purge", "counter", "Purge invocations", -1)
+	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
+	mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if scrapeErr := (ScrapeInnodbMetrics{}).Scrape(t.Context(), &instance{db: db}, ch, promslog.NewNopLogger()); scrapeErr != nil {
+			t.Errorf("error calling function on test: %s", scrapeErr)
+		}
+	}()
+
+	collected := metricsByName(t, ch)
+
+	// A cumulative counter cannot be negative, so neither the stable alias nor
+	// the generic counter may carry the sentinel.
+	assertNoMetric(t, collected,
+		"mysql_innodb_metrics_purge_invocations_total",
+		"mysql_info_schema_innodb_metrics_purge_purge_invoked_total",
+	)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestScrapeInnodbMetricsGaugeOverrideKeepsNegativeGauge(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(sanitizeQuery(infoSchemaInnodbMetricsEnabledColumnQuery)).
+		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("STATUS"))
+	// Only counters are dropped for a negative value: an LSN position reported
+	// as a value is a legitimate sample and dashboards still need the gauge.
+	rows := sqlmock.NewRows([]string{"name", "subsystem", "type", "comment", "count"}).
+		AddRow("log_lsn_current", "log", "value", "Current LSN", -1)
+	query := fmt.Sprintf(infoSchemaInnodbMetricsQuery, "status", "enabled")
+	mock.ExpectQuery(sanitizeQuery(query)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if scrapeErr := (ScrapeInnodbMetrics{}).Scrape(t.Context(), &instance{db: db}, ch, promslog.NewNopLogger()); scrapeErr != nil {
+			t.Errorf("error calling function on test: %s", scrapeErr)
+		}
+	}()
+
+	collected := metricsByName(t, ch)
+
+	assertMetric(t, collected, "mysql_info_schema_innodb_metrics_log_log_lsn_current", -1, dto.MetricType_GAUGE)
+	assertNoMetric(t, collected, "mysql_info_schema_innodb_metrics_log_log_lsn_current_total")
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}

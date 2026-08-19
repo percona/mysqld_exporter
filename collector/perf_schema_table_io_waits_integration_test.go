@@ -27,10 +27,6 @@ import (
 )
 
 func TestScrapePerfTableIOWaitsMySQLCompatibility(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping testcontainers integration test in -short mode")
-	}
-
 	cases := []struct {
 		name  string
 		image string

@@ -41,40 +41,52 @@ var (
 		"Ratio of InnoDB checkpoint age to total redo log capacity.", nil, nil,
 	)
 
-	// Compatibility descriptors preserve the status names provided by Percona
-	// Server on Oracle MySQL 8.4 and newer, where Oracle exposes renamed status
-	// variables. They allow existing dashboards to keep working while migrating
-	// to the stable mysql_innodb_redo_log_* metrics above.
+	// Compatibility descriptors preserve the status names that Percona Server,
+	// MySQL 5.7 and MariaDB expose but Oracle MySQL never had: Oracle covers the
+	// same ground with the Innodb_redo_log_* variables introduced by the 8.0.30
+	// redo log rework. Dashboards querying the historical names therefore see
+	// nothing on Oracle MySQL 8.0.30 and newer, and these aliases keep them
+	// working while they migrate to the stable mysql_innodb_redo_log_* metrics
+	// above.
+	//
+	// There is deliberately no alias for Innodb_checkpoint_max_age: on Percona
+	// Server it reports the sync flush threshold, whereas the only comparable
+	// value Oracle exposes is the full redo log capacity, so a single series
+	// name would mean different things per vendor. Dashboards use
+	// mysql_innodb_redo_log_capacity_bytes as the limit series instead.
 	innodbLSNCurrentCompatDesc = newDesc(
 		globalStatus, "innodb_lsn_current", "Current InnoDB redo log sequence number.",
 	)
 	innodbLSNLastCheckpointCompatDesc = newDesc(
 		globalStatus, "innodb_lsn_last_checkpoint", "InnoDB redo log checkpoint log sequence number.",
 	)
+	// Paired with innodb_lsn_current by the log buffer usage panels, which
+	// subtract the two, so the alias is only useful if both are present.
+	innodbLSNFlushedCompatDesc = newDesc(
+		globalStatus, "innodb_lsn_flushed", "InnoDB redo log sequence number flushed to disk.",
+	)
 	innodbCheckpointAgeCompatDesc = newDesc(
 		globalStatus, "innodb_checkpoint_age", "Bytes of InnoDB redo generated since the last checkpoint.",
-	)
-	innodbCheckpointMaxAgeCompatDesc = newDesc(
-		globalStatus, "innodb_checkpoint_max_age",
-		"Maximum InnoDB checkpoint age compatibility value based on total redo log capacity.",
 	)
 )
 
 type innodbRedoStatus struct {
 	currentLSN             float64
 	checkpointLSN          float64
+	flushedLSN             float64
 	checkpointAge          float64
 	capacity               float64
 	written                float64
 	hasCurrentLSN          bool
 	hasCheckpointLSN       bool
+	hasFlushedLSN          bool
 	hasCheckpointAge       bool
 	hasCapacity            bool
 	hasWritten             bool
 	hasLegacyCurrent       bool
 	hasLegacyCheckpoint    bool
+	hasLegacyFlushed       bool
 	hasLegacyCheckpointAge bool
-	hasCheckpointMaxAge    bool
 }
 
 func (s *innodbRedoStatus) observe(key string, value float64) {
@@ -97,14 +109,19 @@ func (s *innodbRedoStatus) observe(key string, value float64) {
 			s.checkpointLSN = value
 			s.hasCheckpointLSN = true
 		}
+	case "innodb_lsn_flushed":
+		s.flushedLSN = value
+		s.hasFlushedLSN = true
+		s.hasLegacyFlushed = true
+	case "innodb_redo_log_flushed_to_disk_lsn":
+		if !s.hasLegacyFlushed {
+			s.flushedLSN = value
+			s.hasFlushedLSN = true
+		}
 	case "innodb_checkpoint_age":
 		s.checkpointAge = value
 		s.hasCheckpointAge = true
 		s.hasLegacyCheckpointAge = true
-	case "innodb_checkpoint_max_age":
-		// This is a checkpoint flush threshold, not the total redo capacity.
-		// The original metric is emitted by the global status collector.
-		s.hasCheckpointMaxAge = true
 	case "innodb_redo_log_capacity_resized":
 		s.capacity = value
 		s.hasCapacity = true
@@ -128,6 +145,10 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
+	if s.hasFlushedLSN && !s.hasLegacyFlushed {
+		ch <- prometheus.MustNewConstMetric(innodbLSNFlushedCompatDesc, prometheus.GaugeValue, s.flushedLSN)
+	}
+
 	if !s.hasCheckpointAge && s.hasCurrentLSN && s.hasCheckpointLSN && s.currentLSN >= s.checkpointLSN {
 		s.checkpointAge = s.currentLSN - s.checkpointLSN
 		s.hasCheckpointAge = true
@@ -143,11 +164,6 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 	}
 	if s.hasCapacity {
 		ch <- prometheus.MustNewConstMetric(innodbRedoCapacityDesc, prometheus.GaugeValue, s.capacity)
-		if !s.hasCheckpointMaxAge {
-			// Best-effort compatibility value: total redo capacity is used in
-			// place of the historical sync flush threshold.
-			ch <- prometheus.MustNewConstMetric(innodbCheckpointMaxAgeCompatDesc, prometheus.GaugeValue, s.capacity)
-		}
 	}
 	if s.hasWritten {
 		ch <- prometheus.MustNewConstMetric(innodbRedoWrittenDesc, prometheus.CounterValue, s.written)
