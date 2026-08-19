@@ -51,7 +51,7 @@ func extractExporter(gzipStream io.Reader, fileName string) {
 		case tar.TypeDir:
 			continue
 		case tar.TypeReg:
-			if strings.HasSuffix(header.Name, "postgres_exporter") {
+			if strings.HasSuffix(header.Name, "mysqld_exporter") {
 				outFile, err := os.Create(fileName)
 				if err != nil {
 					log.Fatalf("ExtractTarGz: Create() failed: %s", err.Error())

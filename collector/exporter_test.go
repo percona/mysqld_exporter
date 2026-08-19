@@ -14,7 +14,6 @@
 package collector
 
 import (
-	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,7 +30,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	exporter := New(
-		context.Background(),
+		t.Context(),
 		dsn,
 		[]Scraper{
 			ScrapeGlobalStatus{},
@@ -70,7 +69,7 @@ func TestExporterDSN(t *testing.T) {
 	convey.Convey("DSN with special characters in password (w/o table)", t, func() {
 		dsn := "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(localhost:3306)/"
 		exporter := New(
-			context.Background(),
+			t.Context(),
 			dsn,
 			[]Scraper{
 				ScrapeGlobalStatus{},
@@ -83,7 +82,7 @@ func TestExporterDSN(t *testing.T) {
 	convey.Convey("DSN with special characters in password (with table)", t, func() {
 		dsn := "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(localhost:3306)/mysql"
 		exporter := New(
-			context.Background(),
+			t.Context(),
 			dsn,
 			[]Scraper{
 				ScrapeGlobalStatus{},
@@ -96,7 +95,7 @@ func TestExporterDSN(t *testing.T) {
 	convey.Convey("DSN with special characters in password, with tls", t, func() {
 		dsn := "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(localhost:3306)/?tls=true"
 		exporter := New(
-			context.Background(),
+			t.Context(),
 			dsn,
 			[]Scraper{
 				ScrapeGlobalStatus{},
@@ -109,7 +108,7 @@ func TestExporterDSN(t *testing.T) {
 	convey.Convey("DSN with special characters in password, no tls", t, func() {
 		dsn := "test:UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+=@tcp(localhost:3306)/test?tls=skip-verify"
 		exporter := New(
-			context.Background(),
+			t.Context(),
 			dsn,
 			[]Scraper{
 				ScrapeGlobalStatus{},
@@ -126,7 +125,7 @@ func TestGetMySQLVersion(t *testing.T) {
 	}
 
 	convey.Convey("Version parsing", t, func() {
-		instance, err := newInstance(dsn)
+		instance, err := newInstance(t.Context(), dsn)
 		convey.So(err, convey.ShouldBeNil)
 
 		convey.So(instance.versionMajorMinor, convey.ShouldBeBetweenOrEqual, 5.7, 11.4)

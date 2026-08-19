@@ -23,7 +23,6 @@
 --exporter.max-idle-conns=3
 --exporter.max-open-conns=3
 --exporter.conn-max-lifetime=55s
---exporter.global-conn-pool
 --collect.info_schema.innodb_tablespaces
 --collect.auto_increment.columns
 --collect.info_schema.tables

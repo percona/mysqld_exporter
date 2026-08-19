@@ -33,32 +33,32 @@ func TestGetMySQLVersion_Percona(t *testing.T) {
 		var semVer semver.Version
 		var err error
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(""))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeError(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "0.0.0")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("something"))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "0.0.0")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("10.1.17-MariaDB"))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "10.1.17")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.7.13-6-log"))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "5.7.13")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.6.30-76.3-56-log"))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "5.6.30")
 
 		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("5.5.51-38.1"))
-		semVer, _, err = queryVersion(db)
+		semVer, _, err = queryVersion(t.Context(), db)
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "5.5.51")
 	})

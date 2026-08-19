@@ -32,10 +32,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          docker compose up -d --wait --wait-timeout 20
+          docker compose up -d --wait --wait-timeout 120
           make format
           make build
           make test

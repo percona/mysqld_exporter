@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // register /debug/pprof
 	"os"
 	"path"
 	"strconv"
@@ -263,9 +264,21 @@ func newHandler(scrapers []collector.Scraper, logger *slog.Logger) http.HandlerF
 		registry := prometheus.NewRegistry()
 		registry.MustRegister(collector.New(ctx, dsn, filteredScrapers, logger))
 
-		gatherers := prometheus.Gatherers{
-			prometheus.DefaultGatherer,
-			registry,
+		useDefaultGatherer := true
+		for _, scraper := range filteredScrapers {
+			name := scraper.Name()
+			if name == "standard.go" || name == "standard.process" {
+				// these scrapers already expose runtime/process metrics, so we disable the default gatherer to avoid duplicates
+				useDefaultGatherer = false
+				break
+			}
+		}
+
+		var gatherers prometheus.Gatherers
+		if useDefaultGatherer {
+			gatherers = prometheus.Gatherers{prometheus.DefaultGatherer, registry}
+		} else {
+			gatherers = prometheus.Gatherers{registry}
 		}
 
 		eLogger := &errLogger{logger: logger}
