@@ -62,10 +62,10 @@ func TestGetMySQLVersion_Percona(t *testing.T) {
 		convey.ShouldBeNil(err)
 		convey.So(semVer.String(), convey.ShouldEqual, "5.5.51")
 
-		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("9.7.1"))
+		mock.ExpectQuery(versionQuery).WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("9.7.2"))
 		semVer, _, err = queryVersion(t.Context(), db)
-		convey.ShouldBeNil(err)
-		convey.So(semVer.String(), convey.ShouldEqual, "9.7.1")
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(semVer.String(), convey.ShouldEqual, "9.7.2")
 	})
 
 	// Ensure all SQL queries were executed
