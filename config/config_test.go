@@ -284,3 +284,72 @@ func TestFormDSNWithCustomTls(t *testing.T) {
 
 	})
 }
+
+func TestFormDSNAddressResolution(t *testing.T) {
+	convey.Convey("Address resolution without a target", t, func() {
+		convey.Convey("Defaults to 127.0.0.1:3306", func() {
+			section := MySqlConfig{User: "usr", Password: "pwd"}
+			dsn, err := section.FormDSN("")
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(dsn, convey.ShouldEqual, "usr:pwd@tcp(127.0.0.1:3306)/")
+		})
+
+		convey.Convey("Host from config with the default port", func() {
+			section := MySqlConfig{User: "usr", Password: "pwd", Host: "server1"}
+			dsn, err := section.FormDSN("")
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(dsn, convey.ShouldEqual, "usr:pwd@tcp(server1:3306)/")
+		})
+
+		convey.Convey("Port from config with the default host", func() {
+			section := MySqlConfig{User: "usr", Password: "pwd", Port: 5000}
+			dsn, err := section.FormDSN("")
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(dsn, convey.ShouldEqual, "usr:pwd@tcp(127.0.0.1:5000)/")
+		})
+
+		convey.Convey("Socket from config wins over host and port", func() {
+			section := MySqlConfig{
+				User:     "usr",
+				Password: "pwd",
+				Host:     "server1",
+				Port:     5000,
+				Socket:   "/run/mysqld/mysqld.sock",
+			}
+			dsn, err := section.FormDSN("")
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(dsn, convey.ShouldEqual, "usr:pwd@unix(/run/mysqld/mysqld.sock)/")
+		})
+	})
+
+	convey.Convey("Target without a port", t, func() {
+		section := MySqlConfig{User: "usr", Password: "pwd"}
+		dsn, err := section.FormDSN("server1")
+		convey.So(err, convey.ShouldBeError, "failed to parse target: address server1: missing port in address")
+		convey.So(dsn, convey.ShouldBeEmpty)
+	})
+}
+
+func TestReloadConfigErrors(t *testing.T) {
+	convey.Convey("Malformed config file", t, func() {
+		c := MySqlConfigHandler{
+			Config: &Config{},
+		}
+		err := c.ReloadConfig("testdata/malformed.cnf", "localhost:3306", "root", true, promslog.NewNopLogger())
+		convey.So(err, convey.ShouldBeError)
+		convey.So(err.Error(), convey.ShouldStartWith, "failed to load config from testdata/malformed.cnf: ")
+	})
+
+	convey.Convey("Sections that fail to parse are skipped", t, func() {
+		c := MySqlConfigHandler{
+			Config: &Config{},
+		}
+		err := c.ReloadConfig("testdata/invalid_value.cnf", "localhost:3306", "root", true, promslog.NewNopLogger())
+		convey.So(err, convey.ShouldBeNil)
+
+		cfg := c.GetConfig()
+		convey.So(cfg.Sections, convey.ShouldContainKey, "client")
+		convey.So(cfg.Sections, convey.ShouldNotContainKey, "client.bad_port")
+		convey.So(cfg.Sections, convey.ShouldNotContainKey, "client.bad_aws_iam_auth")
+	})
+}
