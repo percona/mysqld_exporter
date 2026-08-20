@@ -86,12 +86,15 @@ jobs:
       - name: Compile-check integration tests
         run: make test-integration-build
 
-      # Only the table I/O waits test runs for now. TestPScrapeProcesslist brings
+      # Only the table I/O waits test runs for now. The -run pattern is anchored:
+      # go test exits 0 when a pattern matches nothing, so an unanchored prefix
+      # would turn this job green while running no tests at all if the function
+      # were renamed. TestPScrapeProcesslist brings
       # up ten database containers in parallel, each server sizing InnoDB from
       # total host memory, and that has not been validated on a hosted runner.
       # Widen this to `make test-integration` once it has.
       - name: Run integration tests
-        run: go test -count 1 -race -tags integration -run TestScrapePerfTableIOWaits ./collector/
+        run: go test -count 1 -race -v -tags integration -run '^TestScrapePerfTableIOWaitsMySQLCompatibility$' ./collector/
 
       - name: Run debug commands on failure
         if: ${{ failure() }}

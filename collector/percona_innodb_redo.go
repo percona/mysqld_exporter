@@ -158,17 +158,20 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	if !s.hasCheckpointAge && s.hasCurrentLSN && s.hasCheckpointLSN && s.currentLSN >= s.checkpointLSN {
-		s.checkpointAge = s.currentLSN - s.checkpointLSN
-		s.hasCheckpointAge = true
+	// Derived into locals rather than back into the receiver, so that collect
+	// stays free of side effects.
+	checkpointAge, hasCheckpointAge := s.checkpointAge, s.hasCheckpointAge
+	if !hasCheckpointAge && s.hasCurrentLSN && s.hasCheckpointLSN && s.currentLSN >= s.checkpointLSN {
+		checkpointAge = s.currentLSN - s.checkpointLSN
+		hasCheckpointAge = true
 	}
-	if s.hasCheckpointAge {
-		ch <- prometheus.MustNewConstMetric(innodbRedoCheckpointAgeDesc, prometheus.GaugeValue, s.checkpointAge)
+	if hasCheckpointAge {
+		ch <- prometheus.MustNewConstMetric(innodbRedoCheckpointAgeDesc, prometheus.GaugeValue, checkpointAge)
 		if !s.hasLegacyCheckpointAge {
-			ch <- prometheus.MustNewConstMetric(innodbCheckpointAgeCompatDesc, prometheus.GaugeValue, s.checkpointAge)
+			ch <- prometheus.MustNewConstMetric(innodbCheckpointAgeCompatDesc, prometheus.GaugeValue, checkpointAge)
 		}
 		if s.hasCapacity && s.capacity > 0 {
-			ch <- prometheus.MustNewConstMetric(innodbRedoUsageDesc, prometheus.GaugeValue, s.checkpointAge/s.capacity)
+			ch <- prometheus.MustNewConstMetric(innodbRedoUsageDesc, prometheus.GaugeValue, checkpointAge/s.capacity)
 		}
 	}
 	if s.hasCapacity {

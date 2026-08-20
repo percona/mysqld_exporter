@@ -17,6 +17,7 @@ package collector
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -90,19 +91,26 @@ func TestScrapePerfTableIOWaitsMySQLCompatibility(t *testing.T) {
 func startPerfTableIOContainer(t *testing.T, ctx context.Context, image string) string {
 	t.Helper()
 
+	// MySQL 9.7 autosizes InnoDB from host memory and gets OOM killed on a
+	// Docker VM that is already busy, where 8.0 still fits. The counters under
+	// test do not depend on either size, so pin them low enough that the test
+	// runs on a developer machine as well as in CI. innodb_redo_log_capacity
+	// only exists on 8.0.30 and newer, so keep it off the 8.0 line: pinning
+	// that entry to an older patch release would fail to start on an unknown
+	// variable rather than skip the flag.
+	args := []string{
+		"--performance-schema=ON",
+		"--innodb-buffer-pool-size=64M",
+	}
+	if !strings.HasPrefix(image, "mysql:8.0") {
+		args = append(args, "--innodb-redo-log-capacity=16M")
+	}
+
 	container, err := tcmysql.Run(ctx, image,
 		tcmysql.WithDatabase("test"),
 		tcmysql.WithUsername("root"),
 		tcmysql.WithPassword("test"),
-		// MySQL 9.7 autosizes InnoDB from host memory and gets OOM killed on a
-		// Docker VM that is already busy, where 8.0 still fits. The counters
-		// under test do not depend on either size, so pin both low enough that
-		// the test runs on a developer machine as well as in CI.
-		testcontainers.WithCmdArgs(
-			"--performance-schema=ON",
-			"--innodb-buffer-pool-size=64M",
-			"--innodb-redo-log-capacity=16M",
-		),
+		testcontainers.WithCmdArgs(args...),
 	)
 	if err != nil {
 		t.Fatalf("starting %s: %v", image, err)
