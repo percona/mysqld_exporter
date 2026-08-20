@@ -24,6 +24,10 @@ var (
 		prometheus.BuildFQName(namespace, "innodb_redo_log", "checkpoint_lsn"),
 		"InnoDB redo log checkpoint log sequence number.", nil, nil,
 	)
+	innodbRedoFlushedLSNDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "innodb_redo_log", "flushed_lsn"),
+		"InnoDB redo log sequence number flushed to disk.", nil, nil,
+	)
 	innodbRedoCheckpointAgeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "innodb_redo_log", "checkpoint_age_bytes"),
 		"Bytes of InnoDB redo generated since the last checkpoint.", nil, nil,
@@ -61,7 +65,9 @@ var (
 		globalStatus, "innodb_lsn_last_checkpoint", "InnoDB redo log checkpoint log sequence number.",
 	)
 	// Paired with innodb_lsn_current by the log buffer usage panels, which
-	// subtract the two, so the alias is only useful if both are present.
+	// subtract the two, so the alias is only useful if both are present. Like
+	// every other alias here it has a canonical counterpart
+	// (innodbRedoFlushedLSNDesc) that dashboards can migrate to.
 	innodbLSNFlushedCompatDesc = newDesc(
 		globalStatus, "innodb_lsn_flushed", "InnoDB redo log sequence number flushed to disk.",
 	)
@@ -145,8 +151,11 @@ func (s *innodbRedoStatus) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	if s.hasFlushedLSN && !s.hasLegacyFlushed {
-		ch <- prometheus.MustNewConstMetric(innodbLSNFlushedCompatDesc, prometheus.GaugeValue, s.flushedLSN)
+	if s.hasFlushedLSN {
+		ch <- prometheus.MustNewConstMetric(innodbRedoFlushedLSNDesc, prometheus.GaugeValue, s.flushedLSN)
+		if !s.hasLegacyFlushed {
+			ch <- prometheus.MustNewConstMetric(innodbLSNFlushedCompatDesc, prometheus.GaugeValue, s.flushedLSN)
+		}
 	}
 
 	if !s.hasCheckpointAge && s.hasCurrentLSN && s.hasCheckpointLSN && s.currentLSN >= s.checkpointLSN {

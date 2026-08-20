@@ -127,6 +127,11 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		"mysql_innodb_metrics_transactions_read_write_committed_total": {
 			value: 3, metricType: dto.MetricType_COUNTER,
 		},
+		// A counter row in stableInnodbMetrics must leave the generic series
+		// exactly as it was before the alias existed: one "_total" counter.
+		"mysql_info_schema_innodb_metrics_transaction_trx_rw_commits_total": {
+			value: 3, metricType: dto.MetricType_COUNTER,
+		},
 		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_neighbor_total": {
 			value: 2, metricType: dto.MetricType_COUNTER,
 		},
@@ -161,6 +166,11 @@ func TestScrapeInnodbMetricsStableAliases(t *testing.T) {
 		// Set owners outside stableInnodbMetrics must keep their historical
 		// gauge type instead of silently turning into counters.
 		"mysql_info_schema_innodb_metrics_buffer_buffer_flush_batch_total_pages_total",
+		// Membership in stableInnodbMetrics must not add an unsuffixed gauge to
+		// a counter row. Only the set_member/set_owner rows gain a second
+		// series, so ten of the twelve entries are a pure rename and this is
+		// what pins that.
+		"mysql_info_schema_innodb_metrics_transaction_trx_rw_commits",
 	}
 	found := make(map[string]bool, len(expected))
 	for metric := range ch {

@@ -71,13 +71,25 @@ type stableInnodbMetric struct {
 	help string
 }
 
-// stableInnodbMetrics provides a version-independent API for metrics used by
-// dashboards. The generic name this collector derives from INNODB_METRICS
-// depends on the row's SUBSYSTEM and on whether its TYPE makes the collector
-// append "_total", and both have moved between server versions: 5.7 reports the
-// redo rows under "recovery" with log_lsn_checkpoint_age as a counter, while 8.0
-// and newer report them under "log" as values. Keep the generic metrics for
-// compatibility and emit these stable aliases in addition.
+// stableInnodbMetrics gives dashboards one short name per metric that does not
+// encode the row's SUBSYSTEM or the "_total" suffix this collector derives from
+// its TYPE. The generic metrics are kept and these aliases are emitted in
+// addition.
+//
+// The aliases are a forward-looking guarantee, not a fix for drift that has
+// already happened: measured on MySQL 8.0.46, 9.7.0, Percona Server 8.4.6,
+// Percona Server 5.7.35 and MariaDB 10.11, all thirteen rows below report the
+// same SUBSYSTEM and the same TYPE, so for the eleven counter and status_counter
+// rows the alias renames a generic name that is already identical on every
+// supported server. That a row can move is not hypothetical - it happened to
+// the log_lsn_* rows between 5.7 and 8.0, which is what
+// innodbMetricGaugeOverrides below deals with - but it has not happened to
+// these, so do not describe them as a compatibility shim.
+//
+// The two "buffer" entries are the only ones that change what this collector
+// exports today. They are set_member and set_owner rows, which the generic
+// branch exported solely as an unsuffixed gauge, so rate() over them was not
+// valid; membership here also emits the correctly typed "_total" counter.
 //
 // Keyed by "<subsystem>/<name>" so that an alias cannot be emitted twice should
 // a future release report one of these names under a second subsystem: two
@@ -130,6 +142,10 @@ var stableInnodbMetrics = map[string]stableInnodbMetric{
 	"adaptive_hash_index/adaptive_hash_pages_added": {
 		name: "adaptive_hash_pages_added_total",
 		help: "Total number of pages added to the adaptive hash index.",
+	},
+	"adaptive_hash_index/adaptive_hash_pages_removed": {
+		name: "adaptive_hash_pages_removed_total",
+		help: "Total number of pages removed from the adaptive hash index.",
 	},
 	"adaptive_hash_index/adaptive_hash_searches": {
 		name: "adaptive_hash_searches_total",

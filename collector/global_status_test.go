@@ -145,6 +145,7 @@ func TestScrapeGlobalStatusInnodbRedoAliases(t *testing.T) {
 	assertMetric(t, collected, "mysql_innodb_redo_log_current_lsn", 1500, dto.MetricType_GAUGE)
 	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_lsn", 1000, dto.MetricType_GAUGE)
 	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_age_bytes", 500, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_flushed_lsn", 1400, dto.MetricType_GAUGE)
 	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_age_ratio", 0.25, dto.MetricType_GAUGE)
 	assertMetric(t, collected, "mysql_innodb_redo_log_capacity_bytes", 2000, dto.MetricType_GAUGE)
 	assertMetric(t, collected, "mysql_innodb_redo_log_written_bytes_total", 4096, dto.MetricType_COUNTER)
