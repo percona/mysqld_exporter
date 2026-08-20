@@ -160,24 +160,33 @@ var stableInnodbMetrics = map[string]stableInnodbMetric{
 // These values are positions or sizes rather than monotonically increasing
 // event counters, but the TYPE reported for them is not stable across versions:
 // 5.7 reports them under "recovery" with log_lsn_checkpoint_age as a counter,
-// while 8.0, 8.4, 9.7 and Percona Server 8.0 report all five under "log" as
+// while 8.0, 8.4, 9.7 and Percona Server 8.0 report all six under "log" as
 // values. The override is therefore a guard, not a description of current
 // server behaviour: on 8.0 and newer it emits exactly what the generic branch
 // below would. It keeps the unsuffixed gauge that dashboards need for
 // max_over_time and direct arithmetic even if a release flips one of these rows
 // to a counter. Dashboards query both the "log" and the "recovery" spelling, so
 // both are listed.
+//
+// log_max_modified_age_sync is the synchronous flush threshold and the primary
+// denominator of the PMM redo log advisor. Were a release to report that row as
+// a counter, it would move to the "_total" spelling, the advisor's threshold
+// term would resolve to nothing, and the check would fall through to the lower
+// _async threshold and start firing earlier with no sign the denominator had
+// changed.
 var innodbMetricGaugeOverrides = map[string]struct{}{
 	"log/log_lsn_checkpoint_age":          {},
 	"log/log_lsn_current":                 {},
 	"log/log_lsn_last_checkpoint":         {},
 	"log/log_lsn_last_flush":              {},
 	"log/log_max_modified_age_async":      {},
+	"log/log_max_modified_age_sync":       {},
 	"recovery/log_lsn_checkpoint_age":     {},
 	"recovery/log_lsn_current":            {},
 	"recovery/log_lsn_last_checkpoint":    {},
 	"recovery/log_lsn_last_flush":         {},
 	"recovery/log_max_modified_age_async": {},
+	"recovery/log_max_modified_age_sync":  {},
 }
 
 // Regexp for matching metric aggregations.

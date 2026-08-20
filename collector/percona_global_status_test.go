@@ -67,3 +67,55 @@ func TestPScrapeGlobalStatusInnodbRedoAliases(t *testing.T) {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
 }
+
+// Same guard as the upstream collector: with both name sets present the
+// historical names must come from the generic path only, never from an alias as
+// well.
+func TestPScrapeGlobalStatusInnodbRedoNativeNamesNotAliased(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+	inst := &instance{db: db}
+
+	rows := sqlmock.NewRows([]string{"Variable_name", "Value"}).
+		AddRow("Innodb_lsn_current", "1500").
+		AddRow("Innodb_lsn_last_checkpoint", "1000").
+		AddRow("Innodb_lsn_flushed", "1400").
+		AddRow("Innodb_checkpoint_age", "500").
+		AddRow("Innodb_checkpoint_max_age", "1600").
+		AddRow("Innodb_redo_log_current_lsn", "9501").
+		AddRow("Innodb_redo_log_checkpoint_lsn", "9001").
+		AddRow("Innodb_redo_log_flushed_to_disk_lsn", "9401").
+		AddRow("Innodb_redo_log_capacity_resized", "2000").
+		AddRow("Innodb_os_log_written", "4096")
+	mock.ExpectQuery(sanitizeQuery(pGlobalStatusQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if scrapeErr := (PScrapeGlobalStatus{}).Scrape(context.Background(), inst, ch, promslog.NewNopLogger()); scrapeErr != nil {
+			t.Errorf("error calling function on test: %s", scrapeErr)
+		}
+	}()
+
+	collected := metricsByName(t, ch)
+
+	assertMetric(t, collected, "mysql_innodb_redo_log_current_lsn", 1500, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_lsn", 1000, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_flushed_lsn", 1400, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_age_bytes", 500, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_checkpoint_age_ratio", 0.25, dto.MetricType_GAUGE)
+	assertMetric(t, collected, "mysql_innodb_redo_log_capacity_bytes", 2000, dto.MetricType_GAUGE)
+
+	assertMetric(t, collected, "mysql_global_status_innodb_lsn_current", 1500, dto.MetricType_UNTYPED)
+	assertMetric(t, collected, "mysql_global_status_innodb_lsn_last_checkpoint", 1000, dto.MetricType_UNTYPED)
+	assertMetric(t, collected, "mysql_global_status_innodb_lsn_flushed", 1400, dto.MetricType_UNTYPED)
+	assertMetric(t, collected, "mysql_global_status_innodb_checkpoint_age", 500, dto.MetricType_UNTYPED)
+	assertMetric(t, collected, "mysql_global_status_innodb_checkpoint_max_age", 1600, dto.MetricType_UNTYPED)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
