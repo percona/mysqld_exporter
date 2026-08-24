@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.12.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/mariadb v0.44.0
-	github.com/testcontainers/testcontainers-go/modules/mysql v0.43.0
+	github.com/testcontainers/testcontainers-go/modules/mysql v0.44.0
 	github.com/tklauser/go-sysconf v0.4.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/ini.v1 v1.67.3
