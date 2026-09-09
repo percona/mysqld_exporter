@@ -73,6 +73,7 @@ type MySqlConfig struct {
 	TlsInsecureSkipVerify bool   `ini:"ssl-skip-verfication"` //nolint:misspell
 	Tls                   string `ini:"tls"`
 	EnableCleartextPlugin bool   `ini:"enable-cleartext-plugin"`
+	TimeZone              string `ini:"time_zone"`
 }
 
 type MySqlConfigHandler struct {
@@ -211,6 +212,10 @@ func (m MySqlConfig) FormDSN(target string) (string, error) {
 	}
 	if m.EnableCleartextPlugin {
 		config.AllowCleartextPasswords = true
+	}
+	if m.TimeZone != "" {
+		// Applied by the driver as `SET time_zone=<value>` on every new connection.
+		config.Params = map[string]string{"time_zone": m.TimeZone}
 	}
 
 	return config.FormatDSN(), nil

@@ -207,6 +207,14 @@ func TestFormDSN(t *testing.T) {
 			}
 			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?allowCleartextPasswords=true")
 		})
+		convey.Convey("With time_zone set", func() {
+			cfg := c.GetConfig()
+			section := cfg.Sections["client.timeZone"]
+			if dsn, err = section.FormDSN(""); err != nil {
+				t.Error(err)
+			}
+			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?time_zone=%27%2B00%3A00%27")
+		})
 	})
 }
 

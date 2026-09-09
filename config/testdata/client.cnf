@@ -12,3 +12,7 @@ password = "UfY9s73Gx`~!?@#$%^&*(){}[]<>|/:;,.-_+="
 user = test
 password = foo
 enable-cleartext-plugin = true
+[client.timeZone]
+user = test
+password = foo
+time_zone = "'+00:00'"
