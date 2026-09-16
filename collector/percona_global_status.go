@@ -109,6 +109,7 @@ func (PScrapeGlobalStatus) Scrape(ctx context.Context, instance *instance, ch ch
 
 	var key string
 	var val sql.RawBytes
+	var redoStatus innodbRedoStatus
 	var textItems = map[string]string{
 		"wsrep_local_state_uuid":   "",
 		"wsrep_cluster_state_uuid": "",
@@ -122,6 +123,7 @@ func (PScrapeGlobalStatus) Scrape(ctx context.Context, instance *instance, ch ch
 		}
 		if floatVal, ok := ParseStatus(val); ok { // Unparsable values are silently skipped.
 			key = ValidPrometheusName(key)
+			redoStatus.observe(key, floatVal)
 			match := pGlobalStatusRE.FindStringSubmatch(key)
 			if match == nil {
 				ch <- prometheus.MustNewConstMetric(
@@ -172,6 +174,8 @@ func (PScrapeGlobalStatus) Scrape(ctx context.Context, instance *instance, ch ch
 			textItems[key] = string(val)
 		}
 	}
+
+	redoStatus.collect(ch)
 
 	// mysql_galera_variables_info metric.
 	if textItems["wsrep_local_state_uuid"] != "" {

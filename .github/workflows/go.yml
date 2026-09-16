@@ -19,6 +19,7 @@ jobs:
           - mysql/mysql-server:8.0
           - mysql:8.4
           - mysql:9.0
+          - mysql:9.7
           - mariadb:10.5
           - mariadb:10.6
           - mariadb:10.11
@@ -32,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
@@ -62,3 +63,43 @@ jobs:
           git status
           docker version
           docker compose version
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: ${{ github.workspace }}/go.mod
+
+      # Kept out of the matrix above on purpose: the integration tests pin the
+      # server images they need and start them through testcontainers, so running
+      # them per matrix entry would start the same containers fourteen times over.
+
+      # Nothing built these files before, so a compile error in an integration
+      # test could not fail the build.
+      - name: Compile-check integration tests
+        run: make test-integration-build
+
+      # Only the table I/O waits test runs for now. The -run pattern is anchored:
+      # go test exits 0 when a pattern matches nothing, so an unanchored prefix
+      # would turn this job green while running no tests at all if the function
+      # were renamed. TestPScrapeProcesslist brings
+      # up ten database containers in parallel, each server sizing InnoDB from
+      # total host memory, and that has not been validated on a hosted runner.
+      # Widen this to `make test-integration` once it has.
+      - name: Run integration tests
+        run: go test -count 1 -race -v -tags integration -run '^TestScrapePerfTableIOWaitsMySQLCompatibility$' ./collector/
+
+      - name: Run debug commands on failure
+        if: ${{ failure() }}
+        run: |
+          env | sort
+          go env | sort
+          docker version
+          free -m
