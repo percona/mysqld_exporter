@@ -215,10 +215,30 @@ func (m MySqlConfig) FormDSN(target string) (string, error) {
 	}
 	if m.TimeZone != "" {
 		// Applied by the driver as `SET time_zone=<value>` on every new connection.
-		config.Params = map[string]string{"time_zone": m.TimeZone}
+		// go-ini has already stripped the surrounding quotes from the my.cnf value,
+		// so it arrives here bare (e.g. +00:00 or UTC) and must be quoted, or the
+		// SET is invalid syntax; do it here rather than relying on the user
+		// pre-quoting the my.cnf value.
+		config.Params = map[string]string{"time_zone": quoteTimeZone(m.TimeZone)}
 	}
 
 	return config.FormatDSN(), nil
+}
+
+// quoteTimeZone returns the time zone as a single-quoted SQL literal so the
+// driver issues a valid SET time_zone='<value>'. Any surrounding quotes the
+// value still carries are removed first (so a pre-quoted value is not
+// double-wrapped) and interior single quotes are doubled so the literal cannot
+// be broken out of.
+func quoteTimeZone(v string) string {
+	v = strings.TrimSpace(v)
+	if len(v) >= 2 {
+		first, last := v[0], v[len(v)-1]
+		if (first == '\'' && last == '\'') || (first == '"' && last == '"') {
+			v = v[1 : len(v)-1]
+		}
+	}
+	return "'" + strings.ReplaceAll(v, "'", "''") + "'"
 }
 
 func (m MySqlConfig) CustomizeTLS() error {
