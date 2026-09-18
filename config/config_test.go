@@ -215,6 +215,22 @@ func TestFormDSN(t *testing.T) {
 			}
 			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?time_zone=%27%2B00%3A00%27")
 		})
+		convey.Convey("With single-quoted time_zone offset", func() {
+			cfg := c.GetConfig()
+			section := cfg.Sections["client.timeZoneQuoted"]
+			if dsn, err = section.FormDSN(""); err != nil {
+				t.Error(err)
+			}
+			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?time_zone=%27%2B00%3A00%27")
+		})
+		convey.Convey("With bare named time_zone", func() {
+			cfg := c.GetConfig()
+			section := cfg.Sections["client.timeZoneBare"]
+			if dsn, err = section.FormDSN(""); err != nil {
+				t.Error(err)
+			}
+			convey.So(dsn, convey.ShouldEqual, "test:foo@tcp(server2:3306)/?time_zone=%27UTC%27")
+		})
 	})
 }
 
