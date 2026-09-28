@@ -26,6 +26,10 @@ import (
 )
 
 func TestScrapeTableSchema(t *testing.T) { //nolint:unused
+	if testing.Short() {
+		t.Skip("-short is passed, skipping test")
+	}
+
 	db, err := sql.Open("mysql", "root@tcp(127.0.0.1:3306)/")
 	if err != nil {
 		t.Fatal(err)
