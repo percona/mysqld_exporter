@@ -20,7 +20,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mariadb v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.44.0
 	github.com/tklauser/go-sysconf v0.4.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/yaml.v2 v2.4.0
 )
