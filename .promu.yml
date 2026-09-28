@@ -1,7 +1,6 @@
 go:
-    # Whenever the Go version is updated here, .circle/config.yml should also
-    # be updated.
-    version: 1.23
+    # Keep in sync with the go directive in go.mod.
+    version: 1.26
 repository:
     path: github.com/percona/mysqld_exporter
 build:
