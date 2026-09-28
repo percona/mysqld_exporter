@@ -63,6 +63,7 @@ jobs:
           git status
           docker version
           docker compose version
+          docker compose logs
 
   integration:
     name: Integration
