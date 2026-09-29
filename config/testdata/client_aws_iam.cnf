@@ -1,0 +1,26 @@
+[client_aws_iam]
+host = rds.example.com
+port = 3306
+user = iamuser
+aws-iam-auth = true
+aws-region = eu-central-1
+[client_aws_iam_no_region]
+host = rds.example.com
+port = 3306
+user = iamuser
+aws-iam-auth = true
+[client_aws_iam_disabled]
+host = rds.example.com
+port = 3306
+user = iamuser
+password = staticpassword
+aws-iam-auth = false
+aws-region = eu-central-1
+[client_aws_iam_rds]
+host = rds.example.com
+port = 3306
+user = iamuser
+aws-iam-auth = true
+aws-region = eu-central-1
+enable-cleartext-plugin = true
+tls = true
