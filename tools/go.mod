@@ -6,7 +6,7 @@ require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/prometheus/promu v0.20.0
 	github.com/reviewdog/reviewdog v0.21.2
-	golang.org/x/tools v0.50.0
+	golang.org/x/tools v0.51.0
 	mvdan.cc/gofumpt v0.12.0
 )
 
@@ -206,7 +206,7 @@ require (
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
+	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
