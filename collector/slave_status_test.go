@@ -18,6 +18,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/blang/semver/v4"
+	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/promslog"
@@ -61,5 +63,101 @@ func TestScrapeSlaveStatus(t *testing.T) {
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
+
+func TestQuerySlaveStatusStatements(t *testing.T) {
+	parseErr := &mysql.MySQLError{Number: erParseError, Message: "You have an error in your SQL syntax"}
+	accessDenied := &mysql.MySQLError{Number: 1227, Message: "Access denied"}
+
+	type step struct {
+		query string
+		err   error
+	}
+	tests := []struct {
+		name    string
+		flavor  string
+		version string
+		steps   []step
+		wantErr bool
+	}{
+		{
+			name:    "MariaDB uses SHOW ALL SLAVES STATUS only",
+			flavor:  FlavorMariaDB,
+			version: "10.11.9",
+			steps:   []step{{query: "SHOW ALL SLAVES STATUS"}},
+		},
+		{
+			name:    "MySQL 8.0.22+ uses SHOW REPLICA STATUS only",
+			flavor:  FlavorMySQL,
+			version: "8.0.36",
+			steps:   []step{{query: "SHOW REPLICA STATUS"}},
+		},
+		{
+			name:    "MySQL 8.4 uses SHOW REPLICA STATUS only",
+			flavor:  FlavorMySQL,
+			version: "8.4.3",
+			steps:   []step{{query: "SHOW REPLICA STATUS"}},
+		},
+		{
+			name:    "MySQL before 8.0.22 uses SHOW SLAVE STATUS only",
+			flavor:  FlavorMySQL,
+			version: "5.7.44",
+			steps:   []step{{query: "SHOW SLAVE STATUS"}},
+		},
+		{
+			name:    "syntax error on the preferred statement falls back to probing",
+			flavor:  FlavorMySQL,
+			version: "8.0.36",
+			steps: []step{
+				{query: "SHOW REPLICA STATUS", err: parseErr},
+				{query: "SHOW ALL SLAVES STATUS", err: parseErr},
+				{query: "SHOW ALL SLAVES STATUS NONBLOCKING", err: parseErr},
+				{query: "SHOW ALL SLAVES STATUS NOLOCK", err: parseErr},
+				{query: "SHOW SLAVE STATUS"},
+			},
+		},
+		{
+			name:    "non-syntax errors are returned without probing",
+			flavor:  FlavorMariaDB,
+			version: "10.11.9",
+			steps:   []step{{query: "SHOW ALL SLAVES STATUS", err: accessDenied}},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			if err != nil {
+				t.Fatalf("error opening a stub database connection: %s", err)
+			}
+			defer db.Close()
+			inst := &instance{db: db, flavor: tt.flavor, version: semver.MustParse(tt.version)}
+
+			for _, s := range tt.steps {
+				if s.err != nil {
+					mock.ExpectQuery(s.query).WillReturnError(s.err)
+				} else {
+					mock.ExpectQuery(s.query).WillReturnRows(sqlmock.NewRows([]string{"Master_Host"}))
+				}
+			}
+
+			rows, err := querySlaveStatus(context.Background(), inst)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected an error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				}
+				rows.Close()
+			}
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("there were unfulfilled expectations: %s", err)
+			}
+		})
 	}
 }

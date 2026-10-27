@@ -18,10 +18,12 @@ package collector
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strings"
 
+	"github.com/blang/semver/v4"
+	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -30,8 +32,65 @@ const (
 	slaveStatus = "slave_status"
 )
 
+// erParseError is the MySQL/MariaDB error number for a syntax error (ER_PARSE_ERROR).
+const erParseError = 1064
+
 var slaveStatusQueries = [3]string{"SHOW ALL SLAVES STATUS", "SHOW SLAVE STATUS", "SHOW REPLICA STATUS"}
-var slaveStatusQuerySuffixes = [3]string{" NONBLOCKING", " NOLOCK", ""}
+var slaveStatusQuerySuffixes = [3]string{"", " NONBLOCKING", " NOLOCK"}
+
+// MySQL 8.0.22 introduced SHOW REPLICA STATUS; 8.4 removed SHOW SLAVE STATUS.
+var replicaStatusMinVersion = semver.MustParse("8.0.22")
+
+// slaveStatusQuery returns the statement the server is known to support, based on the
+// flavor and version detected for the instance. It returns "" when the flavor is unknown.
+func slaveStatusQuery(instance *instance) string {
+	switch {
+	case instance.flavor == FlavorMariaDB:
+		// Only the ALL form returns every named connection of a multi-source replica.
+		return "SHOW ALL SLAVES STATUS"
+	case instance.flavor == FlavorMySQL && instance.version.GTE(replicaStatusMinVersion):
+		return "SHOW REPLICA STATUS"
+	case instance.flavor == FlavorMySQL:
+		return "SHOW SLAVE STATUS"
+	default:
+		return ""
+	}
+}
+
+func isParseError(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == erParseError
+}
+
+// querySlaveStatus runs the statement matching the detected flavor and version, and only
+// probes the other syntaxes (MariaDB, MySQL, lock-free variants) when that statement is
+// rejected as a syntax error or the flavor is unknown. This avoids sending statements the
+// server is known not to support on every scrape.
+func querySlaveStatus(ctx context.Context, instance *instance) (*sql.Rows, error) {
+	db := instance.getDB()
+	preferred := slaveStatusQuery(instance)
+	if preferred != "" {
+		rows, err := db.QueryContext(ctx, preferred)
+		if err == nil || !isParseError(err) {
+			return rows, err
+		}
+	}
+
+	var err error
+	for _, query := range slaveStatusQueries {
+		for _, suffix := range slaveStatusQuerySuffixes {
+			statement := query + suffix
+			if statement == preferred {
+				continue
+			}
+			var rows *sql.Rows
+			if rows, err = db.QueryContext(ctx, statement); err == nil {
+				return rows, nil
+			}
+		}
+	}
+	return nil, err
+}
 
 func columnIndex(slaveCols []string, colName string) int {
 	for idx := range slaveCols {
@@ -70,26 +129,7 @@ func (ScrapeSlaveStatus) Version() float64 {
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (ScrapeSlaveStatus) Scrape(ctx context.Context, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger) error {
-	var (
-		slaveStatusRows *sql.Rows
-		err             error
-	)
-	db := instance.getDB()
-	// Try the both syntax for MySQL/Percona and MariaDB
-	for _, query := range slaveStatusQueries {
-		slaveStatusRows, err = db.QueryContext(ctx, query)
-		if err != nil { // MySQL/Percona
-			// Leverage lock-free SHOW SLAVE STATUS by guessing the right suffix
-			for _, suffix := range slaveStatusQuerySuffixes {
-				slaveStatusRows, err = db.QueryContext(ctx, fmt.Sprint(query, suffix))
-				if err == nil {
-					break
-				}
-			}
-		} else { // MariaDB
-			break
-		}
-	}
+	slaveStatusRows, err := querySlaveStatus(ctx, instance)
 	if err != nil {
 		return err
 	}
