@@ -38,8 +38,11 @@ const erParseError = 1064
 var slaveStatusQueries = [3]string{"SHOW ALL SLAVES STATUS", "SHOW SLAVE STATUS", "SHOW REPLICA STATUS"}
 var slaveStatusQuerySuffixes = [3]string{"", " NONBLOCKING", " NOLOCK"}
 
-// MySQL 8.0.22 introduced SHOW REPLICA STATUS; 8.4 removed SHOW SLAVE STATUS.
-var replicaStatusMinVersion = semver.MustParse("8.0.22")
+// MySQL 8.4 removed SHOW SLAVE STATUS. SHOW REPLICA STATUS exists since 8.0.22, but it
+// renames columns (Slave_IO_Running -> Replica_IO_Running, Seconds_Behind_Master ->
+// Seconds_Behind_Source), and metric names are derived from column names, so it is only
+// used where SHOW SLAVE STATUS is no longer available.
+var replicaStatusMinVersion = semver.MustParse("8.4.0")
 
 // slaveStatusQuery returns the statement the server is known to support, based on the
 // flavor and version detected for the instance. It returns "" when the flavor is unknown.
