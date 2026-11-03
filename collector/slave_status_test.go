@@ -15,6 +15,8 @@ package collector
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -135,14 +137,23 @@ func TestQuerySlaveStatusStatements(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			// sqlmock answers an unexpected query with a plain error, which querySlaveStatus
+			// would treat as a failed probe, so record every statement actually sent.
+			var sent []string
+			matcher := sqlmock.QueryMatcherFunc(func(expectedSQL, actualSQL string) error {
+				sent = append(sent, actualSQL)
+				return sqlmock.QueryMatcherEqual.Match(expectedSQL, actualSQL)
+			})
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(matcher))
 			if err != nil {
 				t.Fatalf("error opening a stub database connection: %s", err)
 			}
 			defer db.Close()
 			inst := &instance{db: db, flavor: tt.flavor, version: semver.MustParse(tt.version)}
 
+			var want []string
 			for _, s := range tt.steps {
+				want = append(want, s.query)
 				if s.err != nil {
 					mock.ExpectQuery(s.query).WillReturnError(s.err)
 				} else {
@@ -152,8 +163,8 @@ func TestQuerySlaveStatusStatements(t *testing.T) {
 
 			rows, err := querySlaveStatus(context.Background(), inst)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected an error, got nil")
+				if wantErr := tt.steps[len(tt.steps)-1].err; !errors.Is(err, wantErr) {
+					t.Fatalf("expected error %v, got %v", wantErr, err)
 				}
 			} else {
 				if err != nil {
@@ -162,6 +173,9 @@ func TestQuerySlaveStatusStatements(t *testing.T) {
 				rows.Close()
 			}
 
+			if !slices.Equal(sent, want) {
+				t.Errorf("statements sent = %q, want %q", sent, want)
+			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
