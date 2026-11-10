@@ -17,7 +17,7 @@ require (
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.45.0
-	github.com/testcontainers/testcontainers-go/modules/mariadb v0.44.0
+	github.com/testcontainers/testcontainers-go/modules/mariadb v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.45.0
 	github.com/tklauser/go-sysconf v0.4.0
 	golang.org/x/sys v0.49.0
