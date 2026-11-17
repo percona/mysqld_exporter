@@ -1,9 +1,8 @@
 name: Package check
 
 # Builds the deb/rpm packages and the image without publishing anything,
-# so packaging changes are tested on every PR.
+# after each merge to main. Run it by hand to test a branch.
 on:
-  pull_request:
   push:
     branches:
       - main
