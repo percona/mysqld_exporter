@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+# creating mysqld_exporter user if it isn't already there
+if ! getent passwd mysqld_exporter >/dev/null; then
+    useradd \
+        --system \
+        --no-create-home \
+        --shell /sbin/nologin \
+        --comment "Prometheus exporter for MySQL server metrics" \
+        mysqld_exporter >/dev/null
+fi
+
+systemctl --system daemon-reload >/dev/null || true
+
+exit 0
