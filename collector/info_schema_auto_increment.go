@@ -19,6 +19,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -52,7 +53,7 @@ var (
 )
 
 // ScrapeAutoIncrementColumns collects auto_increment column information.
-type ScrapeAutoIncrementColumns struct{}
+type ScrapeAutoIncrementColumns config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeAutoIncrementColumns) Name() string {

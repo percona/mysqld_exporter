@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -141,7 +142,7 @@ var (
 )
 
 // ScrapeClientStat collects from `information_schema.client_statistics`.
-type ScrapeClientStat struct{}
+type ScrapeClientStat config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeClientStat) Name() string {
@@ -190,7 +191,7 @@ func (ScrapeClientStat) Scrape(ctx context.Context, instance *instance, ch chan<
 	var (
 		client             string                                // Holds the client name, which should be in column 0.
 		clientStatData     = make([]float64, len(columnNames)-1) // 1 less because of the client column.
-		clientStatScanArgs = make([]interface{}, len(columnNames))
+		clientStatScanArgs = make([]any, len(columnNames))
 	)
 
 	clientStatScanArgs[0] = &client
@@ -204,8 +205,8 @@ func (ScrapeClientStat) Scrape(ctx context.Context, instance *instance, ch chan<
 		}
 
 		// Loop over column names, and match to scan data. Unknown columns
-		// will be filled with an untyped metric number. We assume other then
-		// cient, that we'll only get numbers.
+		// will be filled with an untyped metric number. We assume other than
+		// client, that we'll only get numbers.
 		for idx, columnName := range columnNames[1:] {
 			if metricType, ok := informationSchemaClientStatisticsTypes[columnName]; ok {
 				ch <- prometheus.MustNewConstMetric(metricType.desc, metricType.vtype, float64(clientStatData[idx]), client)

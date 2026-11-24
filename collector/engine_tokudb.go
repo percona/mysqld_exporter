@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -32,7 +33,7 @@ const (
 )
 
 // ScrapeEngineTokudbStatus scrapes from `SHOW ENGINE TOKUDB STATUS`.
-type ScrapeEngineTokudbStatus struct{}
+type ScrapeEngineTokudbStatus config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeEngineTokudbStatus) Name() string {
@@ -90,7 +91,7 @@ func sanitizeTokudbMetric(metricName string) string {
 		"/": "and",
 	}
 	for r := range replacements {
-		metricName = strings.Replace(metricName, r, replacements[r], -1)
+		metricName = strings.ReplaceAll(metricName, r, replacements[r])
 	}
 	return metricName
 }

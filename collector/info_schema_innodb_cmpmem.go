@@ -19,6 +19,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -53,7 +54,7 @@ var (
 )
 
 // ScrapeInnodbCmp collects from `information_schema.innodb_cmp`.
-type ScrapeInnodbCmpMem struct{}
+type ScrapeInnodbCmpMem config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeInnodbCmpMem) Name() string {

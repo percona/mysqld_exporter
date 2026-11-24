@@ -19,6 +19,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -45,7 +46,7 @@ var (
 )
 
 // ScrapePerfIndexIOWaits collects for `performance_schema.table_io_waits_summary_by_index_usage`.
-type ScrapePerfIndexIOWaits struct{}
+type ScrapePerfIndexIOWaits config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapePerfIndexIOWaits) Name() string {

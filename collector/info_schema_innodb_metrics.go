@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"regexp"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -196,7 +197,7 @@ var (
 )
 
 // ScrapeInnodbMetrics collects from `information_schema.innodb_metrics`.
-type ScrapeInnodbMetrics struct{}
+type ScrapeInnodbMetrics config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeInnodbMetrics) Name() string {
@@ -230,7 +231,7 @@ func (ScrapeInnodbMetrics) Scrape(ctx context.Context, instance *instance, ch ch
 	case "ENABLED":
 		query = fmt.Sprintf(infoSchemaInnodbMetricsQuery, "enabled", "1")
 	default:
-		return errors.New("Couldn't find column STATUS or ENABLED in innodb_metrics table.")
+		return errors.New("couldn't find column STATUS or ENABLED in innodb_metrics table")
 	}
 
 	innodbMetricsRows, err := db.QueryContext(ctx, query)

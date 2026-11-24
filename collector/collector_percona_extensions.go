@@ -16,8 +16,29 @@ package collector
 import (
 	"database/sql"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+var collectorFailuresAsError = kingpin.Flag(
+	"collector.failures.error",
+	"Log collector failures as errors (Debug by default)").Bool()
+
+// withPerconaScrapers adds the scrapers maintained by Percona to the upstream ones.
+func withPerconaScrapers(scrapers []Scraper) []Scraper {
+	return append(scrapers,
+		PScrapeGlobalStatus{},
+		ScrapePlugins{},
+		PScrapeProcesslist{},
+		PScrapeInnodbCmp{},
+		PScrapeInnodbCmpMem{},
+		ScrapeCustomQuery{Resolution: HR},
+		ScrapeCustomQuery{Resolution: MR},
+		ScrapeCustomQuery{Resolution: LR},
+		NewStandardGo(),
+		NewStandardProcess(),
+	)
+}
 
 /* percona private accessors */
 

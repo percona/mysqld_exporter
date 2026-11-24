@@ -17,6 +17,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -80,7 +81,7 @@ var (
 		[]string{"user"}, nil)
 )
 
-type ScrapeSysUserSummary struct{}
+type ScrapeSysUserSummary config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeSysUserSummary) Name() string {
@@ -118,7 +119,7 @@ func (ScrapeSysUserSummary) Scrape(ctx context.Context, instance *instance, ch c
 		current_connections    uint64
 		total_connections      uint64
 		unique_hosts           uint64
-		current_memory         uint64
+		current_memory         int64
 		total_memory_allocated uint64
 	)
 

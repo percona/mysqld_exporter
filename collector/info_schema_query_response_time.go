@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -100,7 +101,7 @@ func processQueryResponseTimeTable(ctx context.Context, instance *instance, ch c
 }
 
 // ScrapeQueryResponseTime collects from `information_schema.query_response_time`.
-type ScrapeQueryResponseTime struct{}
+type ScrapeQueryResponseTime config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeQueryResponseTime) Name() string {

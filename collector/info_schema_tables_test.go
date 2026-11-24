@@ -38,7 +38,6 @@ func TestScrapeTableSchema(t *testing.T) { //nolint:unused
 
 	dbName := "test_cache_db"
 	tableName := "test_cache_table"
-	*tableSchemaDatabases = dbName
 
 	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
 	if err != nil {
@@ -81,7 +80,7 @@ func addRowAndCheckRowsCount(t *testing.T, ctx context.Context, db *sql.DB, dbNa
 		instance := &instance{
 			db: db,
 		}
-		if err = (ScrapeTableSchema{}).Scrape(ctx, instance, ch, promslog.NewNopLogger()); err != nil {
+		if err = (ScrapeTableSchema{Databases: dbName}).Scrape(ctx, instance, ch, promslog.NewNopLogger()); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)

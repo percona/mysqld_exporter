@@ -9,6 +9,56 @@ Changes:
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.21.0 / 2026-10-22
+
+BREAKING CHANGES:
+
+* Selected `mysql_global_status_*` and `mysql_slave_status_*` metrics now expose Counter or Gauge types instead of Untyped.
+This includes query and table-cache totals, thread and uptime values, and replica running and lag values.
+Consumers that inspect metric family types should review these series. #1099
+
+Changes:
+
+* [FEATURE] Add the optional `info_schema.innodb_trx` collector for active transaction counts and oldest transaction age by state. #1087
+* [FEATURE] Add the optional `info_schema.schema_size` collector, exporting data and index size per schema. #1091
+* [ENHANCEMENT] Type selected global and replica status metrics as counters or gauges. #1099
+* [BUGFIX] Allow literal dollar signs in configuration-file passwords by escaping them as `$$`. #1005
+* [BUGFIX] Preserve HTTP/2 negotiation across web TLS configuration reloads through the exporter-toolkit update. #1089
+* [BUGFIX] Parse the binary log file number after the final dot when the basename contains dots. #1095
+
+## 0.20.0 / 2026-08-12
+
+Changes:
+
+* [FEATURE] Add tls-min-version and tls-max-version config options #1027
+* [FEATURE] Add an optional tls-server-name config option used to verify the server hostname #1044
+* [FEATURE] Add `--exporter.query_timeout` to apply a per-scraper timeout so a single slow scraper cannot cancel the others sharing the request context #1025
+* [ENHANCEMENT] Add distroless Docker image variant #1030
+* [ENHANCEMENT] Publish images to GHCR #1031
+* [ENHANCEMENT] Raise the default per-scrape connection limit from 1 to 2 and add `--exporter.max_open_connections` to configure it, preventing scrapers from cascade-failing behind a slow query #1025
+* [BUGFIX] Fix a race condition due to which targets could use custom CA from different config sections #1044
+
+## 0.19.0 / 2026-03-18
+
+Changes:
+
+* [FEATURE] Add support for cleartext authentication #980
+* [FEATURE] Add support for  unix:// prefix addresses #1003
+* [FEATURE] Allow excluding additional schemas from `perf_schema.eventsstatements` #1011
+* [BUGFIX] sys.user_summary: Fix handling of negative current_memory values #985
+
+## 0.18.0 / 2025-09-25
+
+Changes:
+
+* [FEATURE] Add RocksDB context metrics #931
+* [FEATURE] Add command line option to explicitly disable `lock_wait_timeout` #896
+* [FEATURE] Add support for MariaDB GTID in slave status #958
+* [ENHANCEMENT] Review regex declarations in innodb and global variables collectors #941
+* [ENHANCEMENT] Mixin: Use `std.parseYaml` instead of Tanka native function #935
+* [ENHANCEMENT] Move exporter flags to main package #967
+* [BUGFIX] Fixed the issue of authentication failure when the password contains the `#` symbol #937
+
 ## 0.17.2 / 2025-02-25
 
 Changes:

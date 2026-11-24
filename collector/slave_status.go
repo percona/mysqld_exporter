@@ -20,8 +20,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -33,6 +35,15 @@ const (
 var slaveStatusQueries = [3]string{"SHOW ALL SLAVES STATUS", "SHOW SLAVE STATUS", "SHOW REPLICA STATUS"}
 var slaveStatusQuerySuffixes = [3]string{" NONBLOCKING", " NOLOCK", ""}
 
+var slaveStatusMetricTypes = map[string]prometheus.ValueType{
+	"replica_io_running":    prometheus.GaugeValue,
+	"replica_sql_running":   prometheus.GaugeValue,
+	"seconds_behind_master": prometheus.GaugeValue,
+	"seconds_behind_source": prometheus.GaugeValue,
+	"slave_io_running":      prometheus.GaugeValue,
+	"slave_sql_running":     prometheus.GaugeValue,
+}
+
 func columnIndex(slaveCols []string, colName string) int {
 	for idx := range slaveCols {
 		if slaveCols[idx] == colName {
@@ -42,7 +53,7 @@ func columnIndex(slaveCols []string, colName string) int {
 	return -1
 }
 
-func columnValue(scanArgs []interface{}, slaveCols []string, colName string) string {
+func columnValue(scanArgs []any, slaveCols []string, colName string) string {
 	var columnIndex = columnIndex(slaveCols, colName)
 	if columnIndex == -1 {
 		return ""
@@ -51,7 +62,7 @@ func columnValue(scanArgs []interface{}, slaveCols []string, colName string) str
 }
 
 // ScrapeSlaveStatus collects from `SHOW SLAVE STATUS`.
-type ScrapeSlaveStatus struct{}
+type ScrapeSlaveStatus config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeSlaveStatus) Name() string {
@@ -104,7 +115,7 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, instance *instance, ch chan
 		// As the number of columns varies with mysqld versions,
 		// and sql.Scan requires []interface{}, we need to create a
 		// slice of pointers to the elements of slaveData.
-		scanArgs := make([]interface{}, len(slaveCols))
+		scanArgs := make([]any, len(slaveCols))
 		for i := range scanArgs {
 			scanArgs[i] = &sql.RawBytes{}
 		}
@@ -126,6 +137,10 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, instance *instance, ch chan
 
 		for i, col := range slaveCols {
 			if value, ok := parseStatus(*scanArgs[i].(*sql.RawBytes)); ok { // Silently skip unparsable values.
+				metricType := prometheus.UntypedValue
+				if typed, ok := slaveStatusMetricTypes[strings.ToLower(col)]; ok {
+					metricType = typed
+				}
 				ch <- prometheus.MustNewConstMetric(
 					prometheus.NewDesc(
 						prometheus.BuildFQName(namespace, slaveStatus, strings.ToLower(col)),
@@ -133,14 +148,50 @@ func (ScrapeSlaveStatus) Scrape(ctx context.Context, instance *instance, ch chan
 						[]string{"master_host", "master_uuid", "channel_name", "connection_name"},
 						nil,
 					),
-					prometheus.UntypedValue,
+					metricType,
 					value,
 					masterHost, masterUUID, channelName, connectionName,
 				)
 			}
 		}
+
+		parseMariaDBGtid(ch, "Gtid_IO_Pos", columnValue(scanArgs, slaveCols, "Gtid_IO_Pos"), masterHost, masterUUID, channelName, connectionName)
+		parseMariaDBGtid(ch, "Gtid_Slave_Pos", columnValue(scanArgs, slaveCols, "Gtid_Slave_Pos"), masterHost, masterUUID, channelName, connectionName)
 	}
 	return nil
+}
+
+func parseMariaDBGtid(ch chan<- prometheus.Metric, name string, value string, masterHost string, masterUUID string, channelName string, connectionName string) {
+	if value == "" {
+		return
+	}
+
+	for gtid := range strings.SplitSeq(value, ",") {
+		parts := strings.Split(gtid, "-")
+		if len(parts) != 3 {
+			continue
+		}
+
+		domainID := parts[0]
+		serverID := parts[1]
+
+		sequence_num, err := strconv.ParseUint(parts[2], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, slaveStatus, strings.ToLower(name)),
+				fmt.Sprintf("%s metric from SHOW SLAVE STATUS.", name),
+				[]string{"master_host", "master_uuid", "channel_name", "connection_name", "domain_id", "server_id"},
+				nil,
+			),
+			prometheus.GaugeValue,
+			float64(sequence_num),
+			masterHost, masterUUID, channelName, connectionName, domainID, serverID,
+		)
+	}
 }
 
 // check interface

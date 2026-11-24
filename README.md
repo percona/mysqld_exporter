@@ -15,10 +15,40 @@ NOTE: Not all collection methods are supported on MySQL/MariaDB < 5.6
 
 ### Required Grants
 
+The default `--mysqld.address=localhost:3306` uses TCP. Because `localhost`
+may resolve to either `127.0.0.1` or `::1`, use an explicit address when
+creating a host-specific MySQL account. For a local IPv4 connection:
+
+```sql
+CREATE USER 'exporter'@'127.0.0.1' IDENTIFIED BY 'XXXXXXXX' WITH MAX_USER_CONNECTIONS 3;
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'127.0.0.1';
+```
+
+Run the exporter with `--mysqld.address=127.0.0.1:3306`. For remote or
+containerized deployments, replace `127.0.0.1` with the client host or address
+that the MySQL server observes.
+
+For a Unix socket connection, such as
+`--mysqld.address=unix:///run/mysqld/mysqld.sock` or a `socket=` entry in the
+configuration file, use a `localhost` account:
+
 ```sql
 CREATE USER 'exporter'@'localhost' IDENTIFIED BY 'XXXXXXXX' WITH MAX_USER_CONNECTIONS 3;
 GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
 ```
+
+For MariaDB 10.5.9 and later, also grant `SLAVE MONITOR` (an alias for
+`REPLICA MONITOR`) when using the enabled-by-default `slave_status` collector.
+`REPLICATION CLIENT` alone does not permit
+[`SHOW REPLICA STATUS`](https://mariadb.com/docs/server/reference/sql-statements/administrative-sql-statements/show/show-replica-status)
+on these versions:
+
+```sql
+GRANT SLAVE MONITOR ON *.* TO 'exporter'@'127.0.0.1';
+```
+
+Use the same account host as in the grants above (`localhost` for a Unix
+socket connection).
 
 NOTE: It is recommended to set a max connection limit for the user to avoid overloading the server with monitoring scrapes under heavy load. This is not supported on all MySQL/MariaDB versions; for example, MariaDB 10.1 (provided with Ubuntu 18.04) [does _not_ support this feature](https://mariadb.com/kb/en/library/create-user/#resource-limit-options).
 
@@ -41,7 +71,7 @@ This exporter supports the multi-target pattern. This allows running a single in
 To use the multi-target functionality, send an http request to the endpoint `/probe?target=foo:3306` where target is set to the DSN of the MySQL instance to scrape metrics from.
 
 To avoid putting sensitive information like username and password in the URL, you can have multiple configurations in `config.my-cnf` file and match it by adding `&auth_module=<section>` to the request.
- 
+
 Sample config file for multiple configurations
 
         [client]
@@ -49,7 +79,13 @@ Sample config file for multiple configurations
         password = foo123
         [client.servers]
         user = bar
-        password = bar123
+        password = ${PASSWORD_FROM_ENV}
+        [client.servers2]
+        user = baz
+        password = MY_$$ECRET
+
+If your password contains a dollar sign (`$`) and you don't want it to be interpreted as an environment variable,
+escape it by doubling it (`$$`). In the example above, the password for `client.servers2` is `MY_$ECRET`.
 
 On the prometheus side you can set a scrape config as follows
 
@@ -102,12 +138,15 @@ collect.heartbeat.utc                                        | 5.1           | U
 collect.info_schema.clientstats                              | 5.5           | If running with userstat=1, set to true to collect client statistics.
 collect.info_schema.innodb_metrics                           | 5.6           | Collect metrics from information_schema.innodb_metrics.
 collect.info_schema.innodb_tablespaces                       | 5.7           | Collect metrics from information_schema.innodb_sys_tablespaces.
+collect.info_schema.innodb_trx                               | 5.5           | Collect active InnoDB transaction counts and oldest transaction age by state (disabled by default).
 collect.info_schema.innodb_cmp                               | 5.5           | Collect InnoDB compressed tables metrics from information_schema.innodb_cmp.
 collect.info_schema.innodb_cmpmem                            | 5.5           | Collect InnoDB buffer pool compression metrics from information_schema.innodb_cmpmem.
 collect.info_schema.processlist                              | 5.1           | Collect thread state counts from information_schema.processlist.
 collect.info_schema.processlist.min_time                     | 5.1           | Minimum time a thread must be in each state to be counted. (default: 0)
 collect.info_schema.query_response_time                      | 5.5           | Collect query response time distribution if query_response_time_stats is ON.
 collect.info_schema.replica_host                             | 5.6           | Collect metrics from information_schema.replica_host_status.
+collect.info_schema.rocksdb_perf_context                     | 5.6           | Collect RocksDB metrics from information_schema.ROCKSDB_PERF_CONTEXT.
+collect.info_schema.schema_size                              | 5.6           | Collect the size of each schema from information_schema.tables (disabled by default).
 collect.info_schema.tables                                   | 5.1           | Collect metrics from information_schema.tables.
 collect.info_schema.tables.databases                         | 5.1           | The list of databases to collect table stats for, or '`*`' for all.
 collect.info_schema.tablestats                               | 5.1           | If running with userstat=1, set to true to collect table statistics.
@@ -139,12 +178,17 @@ collect.sys.user_summary                                     | 5.7           | C
 ### General Flags
 Name                                       | Description
 -------------------------------------------|--------------------------------------------------------------------------------------------------
-mysqld.address                             | Hostname and port used for connecting to MySQL server, format: `host:port`. (default: `localhost:3306`)
+mysqld.address                             | Default hostname and port for connecting to MySQL server, format: `host:port`. Configuration file values take precedence, see [Configuration precedence](#configuration-precedence). (default: `localhost:3306`)
 mysqld.username                            | Username to be used for connecting to MySQL Server
 config.my-cnf                              | Path to .my.cnf file to read MySQL credentials from. (default: `~/.my.cnf`)
 log.level                                  | Logging verbosity (default: info)
 exporter.lock_wait_timeout                 | Set a lock_wait_timeout (in seconds) on the connection to avoid long metadata locking. (default: 2)
+exporter.enable_lock_wait_timeout          | Enable the lock_wait_timeout connection parameter. Makes the exporter compatible with older versions of MySQL. (default: true)
 exporter.log_slow_filter                   | Add a log_slow_filter to avoid slow query logging of scrapes.  NOTE: Not supported by Oracle MySQL.
+exporter.query_timeout                     | Per-scraper query timeout (in seconds). 0 disables the timeout. (default: 0, disabled)
+exporter.max_open_connections              | Maximum number of open connections to the database per scrape. Must be >= 1. The pool is per scrape request, so in multi-target mode total connections scale with concurrent targets; keep the value within the exporter user's `MAX_USER_CONNECTIONS` grant. (default: 2)
+exporter.max_idle_connections              | Maximum number of idle connections retained during a scrape, capped by `exporter.max_open_connections`. Must be >= 0; 0 disables idle connections. (default: 1)
+exporter.conn_max_lifetime                 | Maximum amount of time a connection may be reused during a scrape, as a duration such as `60s` or `5m`. Must be >= 0; 0 disables the lifetime limit. (default: 0s, disabled)
 tls.insecure-skip-verify                   | Ignore tls verification errors.
 web.config.file                            | Path to a [web configuration file](#tls-and-basic-authentication)
 web.listen-address                         | Address to listen on for web interface and telemetry.
@@ -158,7 +202,48 @@ MYSQLD_EXPORTER_PASSWORD                   | Password to be used for connecting 
 
 ### Configuration precedence
 
-If you have configured cli with both `mysqld` flags and a valid configuration file, the options in the configuration file will override the flags for `client` section.
+For the `[client]` section, non-empty `host`, `port`, and `user` values in the file selected by `--config.my-cnf` take precedence over `--mysqld.address` and `--mysqld.username`.
+These flags only fill missing or empty fields, the host and port are resolved independently.
+
+For example, with `port=3306` and no `host` in `[client]`, passing `--mysqld.address=10.0.0.0:10000` connects to `10.0.0.0:3306`.
+
+To use the command-line address, use an exporter-specific configuration file containing credentials without `host`, `port`, or `socket` settings.
+
+To keep the existing configuration file unchanged, scrape `/probe?target=10.0.0.0:10000&auth_module=client`.
+The explicit `target` overrides the configured `host`, `port`, and `socket` while retaining the credentials and TLS settings from the selected section.
+
+See [Multi-target support](#multi-target-support) for the Prometheus scrape configuration.
+
+### Database authentication
+
+Omit `auth` or leave it empty in a `.my.cnf` section to use native MySQL authentication with the configured credentials, authentication plugins, Unix sockets, and TLS options.
+
+#### AWS IAM authentication
+
+Set `auth=aws-iam` to use IAM tokens with RDS or Aurora MySQL. Credentials come from the [AWS SDK's default chain](https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html): environment credentials, shared AWS profiles (including IAM Identity Center), or workload IAM roles. Set `AWS_PROFILE` to select a named profile.
+
+[IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.html) must be enabled for the database and configured for its user. The user needs the usual [exporter grants](#required-grants), and the signing identity needs [`rds-db:connect`](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) permission for that database user's ARN.
+
+```ini
+[client]
+auth = aws-iam
+user = exporter
+password =
+host = <rds-or-aurora-endpoint>
+aws-iam-region = us-east-1
+ssl-ca = /path/to/rds-ca-bundle.pem
+# Optional: assume another IAM role.
+# aws-iam-role-arn = arn:aws:iam::<account-id>:role/<role-name>
+```
+
+- `aws-iam-region` overrides the Region; omit it to use the environment, shared AWS configuration, or EC2 metadata.
+- `aws-iam-role-arn` assumes the specified role using the discovered credentials. The caller must be allowed to call `sts:AssumeRole` and trusted by that role; the `rds-db:connect` permission belongs to the assumed role.
+- IAM mode requires a TCP endpoint and TLS without plaintext fallback. `ssl-ca` can supply the [RDS CA bundle](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html).
+- `tls=false` and `tls=preferred` are rejected; `tls=skip-verify` disables certificate verification.
+- Static passwords are rejected; `password=` clears any password inherited from another section or `MYSQLD_EXPORTER_PASSWORD`. Tokens are generated automatically for each new physical connection.
+- IAM authentication requirements are checked at startup and reload. Invalid sections are logged and skipped; if no valid sections remain, reload fails and preserves the previous configuration. AWS credentials are loaded when a connection is opened.
+
+For `/probe`, select the section with `auth_module`; tokens use the effective target endpoint and configured database user.
 
 ## TLS and basic authentication
 
@@ -183,6 +268,20 @@ ssl-key=/path/to/ssl/client/key
 ssl-cert=/path/to/ssl/client/cert
 ```
 
+Configure `ssl-key` and `ssl-cert` together; `ssl-ca` is optional. The client keypair is preserved with `--tls.insecure-skip-verify` or `tls=skip-verify`. Invalid or incomplete keypairs return an error.
+
+It's possible to also restrict the TLS versions that can be used between the MySQL server and mysqld exporter by specifying versions in the mysql cnf file like this:
+
+```
+tls-min-version=TLSv1.2
+tls-max-version=TLSv1.3
+```
+
+In some environments the MySQL server's TLS certificate SN or SAN may not include the host that mysqld exporter uses to connect to it. This could happen in cases when the certificate includes only DNS names, while mysqld exporter uses an IP address to connect. To allow secure connections in these cases, tls-server-name can be used to specify the server's name to use during verification. The parameter works the same as server_name in Prometheus's scrape config configuration.
+
+```
+tls-server-name=mysql.example
+```
 
 ## Using Docker
 
@@ -210,6 +309,57 @@ reference heartbeat implementation supported.
 [pth]:https://www.percona.com/doc/percona-toolkit/2.2/pt-heartbeat.html
 
 
+## InnoDB transactions
+
+Enable `--collect.info_schema.innodb_trx` to collect from
+`information_schema.innodb_trx`. This collector supports MySQL >= 5.6,
+Percona Server for MySQL >= 5.6, and MariaDB >= 10.3. It requires the `PROCESS`
+privilege, included in the [required grants](#required-grants).
+The `5.5` entry in the collector flags table reflects availability of
+`INNODB_TRX` in [MySQL 5.5](https://downloads.mysql.com/docs/refman-5.5-en.a4.pdf);
+the exporter's supported MySQL minimum remains 5.6.
+See the [MySQL](https://dev.mysql.com/doc/refman/8.4/en/information-schema-innodb-trx-table.html)
+and [MariaDB](https://mariadb.com/docs/server/reference/system-tables/information-schema/information-schema-tables/information-schema-innodb-tables/information-schema-innodb_trx-table)
+table documentation.
+
+Metric | Type | Description
+-------|------|------------
+`mysql_info_schema_innodb_trx_transactions` | Gauge | Number of active transactions in each state.
+`mysql_info_schema_innodb_trx_oldest_transaction_age_seconds` | Gauge | Age in seconds of the oldest active transaction in each state.
+
+Both metrics have a `state` label using the database's values: `RUNNING`,
+`LOCK WAIT`, `ROLLING BACK`, or `COMMITTING`. Only states present in the table
+are emitted; an empty table produces no transaction metrics. The collector
+includes transactions of all ages. Choose alert thresholds in PromQL, for example:
+
+```promql
+max by (instance) (mysql_info_schema_innodb_trx_oldest_transaction_age_seconds) > 300
+```
+
+## Schema size
+
+Enable `--collect.info_schema.schema_size` to collect the size of each schema
+(database) from `information_schema.tables`. This collector supports MySQL >= 5.6,
+Percona Server for MySQL >= 5.6, and MariaDB >= 10.3. See the
+[MySQL](https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html)
+and [MariaDB](https://mariadb.com/docs/server/reference/system-tables/information-schema/information-schema-tables/information-schema-tables-table)
+table documentation. Unlike `--collect.info_schema.tables`, which exposes
+series for every table, this collector exposes one series per schema, so its
+cardinality does not grow with the number of tables. It needs no privileges beyond the
+[required grants](#required-grants); schemas without tables, or whose tables are
+not visible to the exporter user, are not reported.
+
+Metric | Type | Description
+-------|------|------------
+`mysql_info_schema_schema_size_bytes` | Gauge | Sum of data and index lengths of the tables in each schema.
+
+The metric has a `schema` label. As with `--collect.info_schema.tables`, the
+`mysql`, `performance_schema`, `information_schema` and `sys` schemas are not
+reported. On MySQL >= 8.0, table sizes in
+`information_schema.tables` are cached according to
+[`information_schema_stats_expiry`](https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html#sysvar_information_schema_stats_expiry)
+(24 hours by default), so the metric may lag behind the actual size.
+
 ## Filtering enabled collectors
 
 The `mysqld_exporter` will expose all metrics from enabled collectors by default. This is the recommended way to collect metrics to avoid errors when comparing metrics of different families.
@@ -225,11 +375,40 @@ params:
 
 This can be useful for having different Prometheus servers collect specific metrics from targets.
 
+## Using as a Go library
+
+Create a runtime for a MySQL target, register its collectors with a caller-owned
+Prometheus registry, and shut down the runtime when it is no longer needed:
+
+```go
+cfg := config.NewConfigWithDefaults()
+cfg.DataSourceName = "exporter@tcp(localhost:3306)/"
+
+runtime, err := collector.NewRuntime(cfg, slog.Default())
+if err != nil {
+	return err
+}
+defer func() {
+	_ = runtime.Shutdown(context.Background())
+}()
+
+registry := prometheus.NewRegistry()
+for _, c := range runtime.Collectors() {
+	if err := registry.Register(c); err != nil {
+		return err
+	}
+}
+
+metricFamilies, err := registry.Gather()
+```
+
+The caller owns the registry and can expose or gather it as needed. Create one
+runtime per MySQL target.
+
 ## Example Rules
 
 There is a set of sample rules, alerts and dashboards available in the [mysqld-mixin](mysqld-mixin/)
 
-[circleci]: https://circleci.com/gh/prometheus/mysqld_exporter
 [hub]: https://hub.docker.com/r/prom/mysqld-exporter/
 [travis]: https://travis-ci.org/prometheus/mysqld_exporter
 [quay]: https://quay.io/repository/prometheus/mysqld-exporter

@@ -22,6 +22,7 @@ import (
 	"log/slog"
 
 	"github.com/blang/semver/v4"
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -83,7 +84,7 @@ var (
 )
 
 // ScrapeInfoSchemaInnodbTablespaces collects from `information_schema.innodb_sys_tablespaces`.
-type ScrapeInfoSchemaInnodbTablespaces struct{}
+type ScrapeInfoSchemaInnodbTablespaces config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeInfoSchemaInnodbTablespaces) Name() string {
@@ -118,7 +119,7 @@ func (ScrapeInfoSchemaInnodbTablespaces) Scrape(ctx context.Context, instance *i
 			query = fmt.Sprintf(innodbTablespacesQueryMariaDB, tablespacesTablename, tablespacesTablename)
 		}
 	default:
-		return errors.New("Couldn't find INNODB_SYS_TABLESPACES or INNODB_TABLESPACES in information_schema.")
+		return errors.New("couldn't find INNODB_SYS_TABLESPACES or INNODB_TABLESPACES in information_schema")
 	}
 
 	tablespacesRows, err := db.QueryContext(ctx, query)
