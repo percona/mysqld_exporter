@@ -87,6 +87,7 @@ func TestBin(t *testing.T) {
 	tests := []func(*testing.T, bin){
 		testLanding,
 		testProbe,
+		testPprof,
 	}
 
 	portStart := 56000
