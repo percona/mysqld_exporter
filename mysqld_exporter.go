@@ -87,7 +87,7 @@ var (
 	exporterMaxOpenConns = kingpin.Flag(
 		"exporter.max_open_connections",
 		"Maximum number of open connections to the database per scrape. Must be >= 1.",
-	).Default("2").Int()
+	).Default(strconv.Itoa(config.DefaultExporterMaxOpenConns)).Int()
 	exporterMaxIdleConns = kingpin.Flag(
 		"exporter.max_idle_connections",
 		"Maximum number of idle connections retained per scrape, capped by exporter.max_open_connections. 0 disables idle connections.",

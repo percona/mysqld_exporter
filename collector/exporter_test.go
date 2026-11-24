@@ -84,8 +84,9 @@ func TestExporterWithOpts(t *testing.T) {
 				promslog.NewNopLogger(),
 			)
 			convey.So(exporter.dsn, convey.ShouldEqual, "root@/mysql?")
-			convey.So(exporter.maxIdleConns, convey.ShouldEqual, 1)
-			convey.So(exporter.connMaxLifetime, convey.ShouldEqual, 0)
+			convey.So(exporter.maxOpenConns, convey.ShouldEqual, 3)
+			convey.So(exporter.maxIdleConns, convey.ShouldEqual, 3)
+			convey.So(exporter.connMaxLifetime, convey.ShouldEqual, time.Minute)
 		})
 
 		convey.Convey("SetSlowLogFilter enabled", func() {

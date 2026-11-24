@@ -153,9 +153,9 @@ func TestConnectionPoolFlags(t *testing.T) {
 		wantMaxIdle int
 		wantLife    time.Duration
 	}{
-		{name: "defaults", wantMaxOpen: 2, wantMaxIdle: 1},
+		{name: "defaults", wantMaxOpen: 3, wantMaxIdle: 3, wantLife: time.Minute},
 		{name: "overrides", args: []string{"--exporter.max_open_connections=4", "--exporter.max_idle_connections=3", "--exporter.conn_max_lifetime=1m30s"}, wantMaxOpen: 4, wantMaxIdle: 3, wantLife: 90 * time.Second},
-		{name: "disabled", args: []string{"--exporter.max_idle_connections=0", "--exporter.conn_max_lifetime=0s"}, wantMaxOpen: 2},
+		{name: "disabled", args: []string{"--exporter.max_idle_connections=0", "--exporter.conn_max_lifetime=0s"}, wantMaxOpen: 3},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if _, err := kingpin.CommandLine.Parse(tt.args); err != nil {

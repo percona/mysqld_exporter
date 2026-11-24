@@ -63,9 +63,9 @@ const (
 	DefaultEnableExporterLockTimeout      = true
 	DefaultSlowLogFilter                  = false
 	DefaultExporterQueryTimeout           = 0
-	DefaultExporterMaxOpenConns           = 2
-	DefaultExporterMaxIdleConns           = 1
-	DefaultExporterConnMaxLifetime        = time.Duration(0)
+	DefaultExporterMaxOpenConns           = 3
+	DefaultExporterMaxIdleConns           = 3
+	DefaultExporterConnMaxLifetime        = time.Minute
 
 	DefaultHeartbeatDatabase = "heartbeat"
 	DefaultHeartbeatTable    = "heartbeat"

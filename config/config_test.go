@@ -35,11 +35,14 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 	if cfg.ExporterLockWaitTimeoutSeconds != DefaultExporterLockWaitTimeoutSeconds {
 		t.Fatalf("unexpected lock wait timeout: got %d, want %d", cfg.ExporterLockWaitTimeoutSeconds, DefaultExporterLockWaitTimeoutSeconds)
 	}
-	if cfg.ExporterMaxIdleConns != 1 {
-		t.Errorf("max idle connections = %d, want 1", cfg.ExporterMaxIdleConns)
+	if cfg.ExporterMaxOpenConns != 3 {
+		t.Errorf("max open connections = %d, want 3", cfg.ExporterMaxOpenConns)
 	}
-	if cfg.ExporterConnMaxLifetime != 0 {
-		t.Errorf("connection max lifetime = %v, want 0", cfg.ExporterConnMaxLifetime)
+	if cfg.ExporterMaxIdleConns != 3 {
+		t.Errorf("max idle connections = %d, want 3", cfg.ExporterMaxIdleConns)
+	}
+	if cfg.ExporterConnMaxLifetime != time.Minute {
+		t.Errorf("connection max lifetime = %v, want 1m", cfg.ExporterConnMaxLifetime)
 	}
 	if cfg.Collectors["global_status"] != false {
 		t.Fatal("global_status should be disabled by default")
