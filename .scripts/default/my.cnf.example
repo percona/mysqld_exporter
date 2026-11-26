@@ -1,0 +1,6 @@
+# Copy to /etc/mysqld_exporter/my.cnf (mode 0640, group mysqld_exporter) and adjust.
+[client]
+user = exporter
+password = changeme
+host = 127.0.0.1
+port = 3306

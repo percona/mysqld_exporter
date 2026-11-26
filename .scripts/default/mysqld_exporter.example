@@ -1,0 +1,8 @@
+# Copy to /etc/default/mysqld_exporter and adjust.
+# Full list of options: mysqld_exporter --help, or https://github.com/percona/mysqld_exporter
+#
+# Credentials go in the client config file, not on the command line:
+#   install -m 0640 -o root -g mysqld_exporter /etc/mysqld_exporter/my.cnf.example /etc/mysqld_exporter/my.cnf
+
+OPTIONS="--config.my-cnf=/etc/mysqld_exporter/my.cnf \
+         --web.listen-address=:9104"
