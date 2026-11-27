@@ -135,9 +135,43 @@ func TestPerconaConnectionPoolFlagsValidation(t *testing.T) {
 func TestPerconaFlagDefaults(t *testing.T) {
 	parseFlags(t)
 
+	// The fork's defaults, which a sync with upstream keeps.
+	cfg := configFromFlags(nil)
+	for name, enabled := range cfg.Collectors {
+		assert.False(t, enabled, name)
+	}
+	cfg.Collectors = nil
+	assert.Equal(t, config.Config{
+		EnableExporterLockWaitTimeout:  true,
+		ExporterLockWaitTimeoutSeconds: 2,
+		ExporterMaxOpenConns:           3,
+		ExporterMaxIdleConns:           3,
+		ExporterConnMaxLifetime:        time.Minute,
+		Heartbeat:                      config.HeartbeatConfig{Database: "heartbeat", Table: "heartbeat"},
+		InfoSchemaProcesslist:          config.InfoSchemaProcesslistConfig{ProcessesByUser: true, ProcessesByHost: true},
+		InfoSchemaTables:               config.InfoSchemaTablesConfig{Databases: "*"},
+		PerfSchemaEventsStatements:     config.PerfSchemaEventsStatementsConfig{Limit: 250, TimeLimit: 86400, DigestTextLimit: 120},
+		PerfSchemaFileInstances:        config.PerfSchemaFileInstancesConfig{Filter: ".*", RemovePrefix: "/var/lib/mysql/"},
+		PerfSchemaMemoryEvents:         config.PerfSchemaMemoryEventsConfig{RemovePrefix: "memory/"},
+	}, cfg)
+
 	assert.Equal(t, path.Join(os.Getenv("HOME"), ".my.cnf"), *configMycnf)
+	assert.Equal(t, "localhost:3306", *mysqldAddress)
+	assert.Equal(t, "/metrics", *metricsPath)
+	assert.InDelta(t, 0.25, *timeoutOffset, 1e-9)
+	assert.False(t, *tlsInsecureSkipVerify)
 	assert.False(t, *collectAll)
-	assert.Equal(t, 0, configFromFlags(nil).InfoSchemaProcesslist.MinTime)
+
+	// The aliases carry the defaults themselves, so --help shows them next to the flag names PMM uses.
+	for name, want := range map[string]string{
+		"exporter.max-open-conns":                  "3",
+		"exporter.max-idle-conns":                  "3",
+		"exporter.conn-max-lifetime":               "1m0s",
+		"collect.info_schema.processlist.min_time": "0",
+		"web.listen-address":                       ":9104",
+	} {
+		assert.Equal(t, []string{want}, kingpin.CommandLine.GetFlag(name).Model().Default, name)
+	}
 }
 
 func TestPerconaProcesslistMinTimeFlags(t *testing.T) {

@@ -163,15 +163,15 @@ var (
 	perconaMaxOpenConns = kingpin.Flag(
 		"exporter.max-open-conns",
 		"Alias of --exporter.max_open_connections, takes precedence when set.",
-	).IsSetByUser(&perconaMaxOpenConnsSet).Int()
+	).Default(strconv.Itoa(config.DefaultExporterMaxOpenConns)).IsSetByUser(&perconaMaxOpenConnsSet).Int()
 	perconaMaxIdleConns = kingpin.Flag(
 		"exporter.max-idle-conns",
 		"Alias of --exporter.max_idle_connections, takes precedence when set.",
-	).IsSetByUser(&perconaMaxIdleConnsSet).Int()
+	).Default(strconv.Itoa(config.DefaultExporterMaxIdleConns)).IsSetByUser(&perconaMaxIdleConnsSet).Int()
 	perconaConnMaxLifetime = kingpin.Flag(
 		"exporter.conn-max-lifetime",
 		"Alias of --exporter.conn_max_lifetime, takes precedence when set.",
-	).IsSetByUser(&perconaConnMaxLifetimeSet).Duration()
+	).Default(config.DefaultExporterConnMaxLifetime.String()).IsSetByUser(&perconaConnMaxLifetimeSet).Duration()
 	perconaMaxOpenConnsSet    bool
 	perconaMaxIdleConnsSet    bool
 	perconaConnMaxLifetimeSet bool
