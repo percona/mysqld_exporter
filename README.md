@@ -186,9 +186,9 @@ exporter.lock_wait_timeout                 | Set a lock_wait_timeout (in seconds
 exporter.enable_lock_wait_timeout          | Enable the lock_wait_timeout connection parameter. Makes the exporter compatible with older versions of MySQL. (default: true)
 exporter.log_slow_filter                   | Add a log_slow_filter to avoid slow query logging of scrapes.  NOTE: Not supported by Oracle MySQL.
 exporter.query_timeout                     | Per-scraper query timeout (in seconds). 0 disables the timeout. (default: 0, disabled)
-exporter.max_open_connections              | Maximum number of open connections to the database per scrape. Must be >= 1. The pool is per scrape request, so in multi-target mode total connections scale with concurrent targets; keep the value within the exporter user's `MAX_USER_CONNECTIONS` grant. (default: 3)
-exporter.max_idle_connections              | Maximum number of idle connections retained during a scrape, capped by `exporter.max_open_connections`. Must be >= 0; 0 disables idle connections. (default: 3)
-exporter.conn_max_lifetime                 | Maximum amount of time a connection may be reused during a scrape, as a duration such as `60s` or `5m`. Must be >= 0; 0 disables the lifetime limit. (default: 1m)
+exporter.max_open_connections              | Maximum number of open connections to the database per scrape. 0 or less means no limit. The pool is per scrape request, so in multi-target mode total connections scale with concurrent targets; keep the value within the exporter user's `MAX_USER_CONNECTIONS` grant. (default: 3)
+exporter.max_idle_connections              | Maximum number of idle connections retained during a scrape, capped by `exporter.max_open_connections`. 0 or less disables idle connections. (default: 3)
+exporter.conn_max_lifetime                 | Maximum amount of time a connection may be reused during a scrape, as a duration such as `60s` or `5m`. 0 or less disables the lifetime limit. (default: 1m)
 tls.insecure-skip-verify                   | Ignore tls verification errors.
 web.config.file                            | Path to a [web configuration file](#tls-and-basic-authentication)
 web.listen-address                         | Address to listen on for web interface and telemetry.
@@ -268,7 +268,7 @@ ssl-key=/path/to/ssl/client/key
 ssl-cert=/path/to/ssl/client/cert
 ```
 
-Configure `ssl-key` and `ssl-cert` together; `ssl-ca` is optional. The client keypair is preserved with `--tls.insecure-skip-verify` or `tls=skip-verify`. Invalid or incomplete keypairs return an error.
+`ssl-key` and `ssl-cert` are used only together and only next to `ssl-ca`, which takes precedence over the `tls` option. `--tls.insecure-skip-verify` takes precedence over all three files. A section that sets `tls-min-version`, `tls-max-version` or `tls-server-name` uses the client keypair without `ssl-ca` and under skip-verify as well.
 
 It's possible to also restrict the TLS versions that can be used between the MySQL server and mysqld exporter by specifying versions in the mysql cnf file like this:
 

@@ -37,7 +37,7 @@ func NewRuntimeWithContext(ctx context.Context, cfg config.Config, logger *slog.
 	if ctx == nil {
 		return nil, errors.New("context is required")
 	}
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidatePercona(); err != nil {
 		return nil, err
 	}
 	if logger == nil {

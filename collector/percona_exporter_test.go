@@ -16,11 +16,13 @@ package collector
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"os"
 	"runtime/pprof"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/promslog"
@@ -93,6 +95,32 @@ func TestGetMySQLVersion(t *testing.T) {
 
 	assert.GreaterOrEqual(t, instance.versionMajorMinor, 5.7)
 	assert.LessOrEqual(t, instance.versionMajorMinor, 11.4)
+}
+
+func TestUnlimitedConnectionPool(t *testing.T) {
+	connDSN := os.Getenv("TEST_MYSQL_DSN")
+	if connDSN == "" {
+		t.Skip("TEST_MYSQL_DSN is not set")
+	}
+
+	instance, err := newInstance(t.Context(), connDSN, 0, -1, -time.Second, nil)
+	require.NoError(t, err)
+	defer instance.Close()
+
+	var conns []*sql.Conn
+	for range 5 {
+		conn, err := instance.db.Conn(t.Context())
+		require.NoError(t, err)
+		conns = append(conns, conn)
+	}
+	for _, conn := range conns {
+		require.NoError(t, conn.Close())
+	}
+
+	stats := instance.db.Stats()
+	assert.Zero(t, stats.MaxOpenConnections)
+	assert.Zero(t, stats.Idle)
+	assert.Zero(t, stats.MaxLifetimeClosed)
 }
 
 func TestPerconaScrapers(t *testing.T) {

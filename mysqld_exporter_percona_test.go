@@ -125,11 +125,21 @@ func TestPerconaConnectionPoolFlags(t *testing.T) {
 	}
 }
 
-func TestPerconaConnectionPoolFlagsValidation(t *testing.T) {
-	parseFlags(t, "--exporter.max-open-conns=0")
+func TestPerconaFlagValidation(t *testing.T) {
+	// The pool flags and --timeout-offset accept any value; zero or less means "no limit" for the pool.
+	parseFlags(t, "--exporter.max-open-conns=0", "--exporter.max-idle-conns=-1", "--exporter.conn-max-lifetime=-1s", "--timeout-offset=-1")
+	require.NoError(t, validatePerconaFlags())
 
-	err := validateExporterFlags(*exporterMaxOpenConns, *exporterMaxIdleConns, *exporterQueryTimeout, *exporterConnMaxLifetime, *timeoutOffset)
-	require.Error(t, err)
+	cfg := configFromFlags(nil)
+	cfg.DataSourceName = "root@tcp(localhost:3306)/"
+	assert.Equal(t, 0, cfg.ExporterMaxOpenConns)
+	assert.Equal(t, -1, cfg.ExporterMaxIdleConns)
+	assert.Equal(t, -time.Second, cfg.ExporterConnMaxLifetime)
+	_, err := collector.NewRuntimeWithContext(t.Context(), cfg, promslog.NewNopLogger())
+	require.NoError(t, err)
+
+	parseFlags(t, "--exporter.query_timeout=-1")
+	require.Error(t, validatePerconaFlags())
 }
 
 func TestPerconaFlagDefaults(t *testing.T) {
@@ -229,6 +239,27 @@ func scrape(handler http.HandlerFunc, ctx context.Context, collect string) *http
 	recorder := httptest.NewRecorder()
 	handler(recorder, httptest.NewRequest(http.MethodGet, target, nil).WithContext(ctx))
 	return recorder
+}
+
+func TestHandlerReportsUnusableCertificateAsDown(t *testing.T) {
+	dir := t.TempDir()
+	caFile := path.Join(dir, "ca.pem")
+	require.NoError(t, os.WriteFile(caFile, []byte("not a certificate\n"), 0o600))
+	cnf := path.Join(dir, "my.cnf")
+	require.NoError(t, os.WriteFile(cnf, []byte("[client]\nuser=root\nhost=127.0.0.1\nssl-ca="+caFile+"\n"), 0o600))
+
+	handler, err := config.NewAuthConfigHandler(prometheus.NewRegistry())
+	require.NoError(t, err)
+	require.NoError(t, handler.ReloadConfig(cnf, "localhost:3306", "", false, promslog.NewNopLogger()))
+	previous := c
+	c = handler
+	t.Cleanup(func() {
+		c = previous
+	})
+
+	recorder := scrape(newHandler(config.NewConfigWithDefaults(), 0, promslog.NewNopLogger()), t.Context(), "")
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "\nmysql_up 0\n")
 }
 
 func TestHandlerDefaultGatherer(t *testing.T) {

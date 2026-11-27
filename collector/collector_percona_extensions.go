@@ -40,6 +40,12 @@ func withPerconaScrapers(scrapers []Scraper) []Scraper {
 	)
 }
 
+// The fork exposes every SHOW GLOBAL STATUS and SHOW SLAVE STATUS value as untyped.
+func init() {
+	clear(globalStatusMetricTypes)
+	clear(slaveStatusMetricTypes)
+}
+
 /* percona private accessors */
 
 const InformationSchema = informationSchema

@@ -438,6 +438,7 @@ func (ch *AuthConfigHandler) ReloadConfig(filename string, mysqldAddress string,
 			logger.Error("failed to parse config", "section", sectionName, "err", err)
 			continue
 		}
+		mysqlcfg.keepPerconaTLSRules()
 		if err := mysqlcfg.validateConfig(); err != nil {
 			logger.Error("failed to validate config", "section", sectionName, "err", err)
 			continue
@@ -586,7 +587,7 @@ func (m MySqlConfig) CustomizeTLS(configSectionName string) error {
 		if ok := caBundle.AppendCertsFromPEM(pemCA); ok {
 			tlsCfg.RootCAs = caBundle
 		} else {
-			return fmt.Errorf("failed parse pem-encoded CA certificates from %s", m.SslCa)
+			return fmt.Errorf("failed to parse pem-encoded CA certificates from %s", m.SslCa)
 		}
 	}
 	if m.SslCert != "" || m.SslKey != "" {

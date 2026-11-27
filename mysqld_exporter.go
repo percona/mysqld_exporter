@@ -86,7 +86,7 @@ var (
 	).Default("0").Int()
 	exporterMaxOpenConns = kingpin.Flag(
 		"exporter.max_open_connections",
-		"Maximum number of open connections to the database per scrape. Must be >= 1.",
+		"Maximum number of open connections to the database per scrape. 0 or less means no limit.",
 	).Default(strconv.Itoa(config.DefaultExporterMaxOpenConns)).Int()
 	exporterMaxIdleConns = kingpin.Flag(
 		"exporter.max_idle_connections",
@@ -202,6 +202,18 @@ func applyPerconaFlagAliases() {
 	if perconaConnMaxLifetimeSet {
 		*exporterConnMaxLifetime = *perconaConnMaxLifetime
 	}
+}
+
+// validatePerconaFlags checks the flags upstream has added; the connection pool flags and
+// --timeout-offset accept any value, and the pool treats zero or less as "no limit".
+func validatePerconaFlags() error {
+	return validateExporterFlags(
+		config.DefaultExporterMaxOpenConns,
+		config.DefaultExporterMaxIdleConns,
+		*exporterQueryTimeout,
+		config.DefaultExporterConnMaxLifetime,
+		defaultTimeoutOffsetSeconds,
+	)
 }
 
 func filterScrapers(scrapers []collector.Scraper, collectParams []string) []collector.Scraper {
@@ -496,7 +508,7 @@ func main() {
 	logger.Info("Starting mysqld_exporter", "version", version.Info())
 	logger.Info("Build context", "build_context", version.BuildContext())
 
-	if err := validateExporterFlags(*exporterMaxOpenConns, *exporterMaxIdleConns, *exporterQueryTimeout, *exporterConnMaxLifetime, *timeoutOffset); err != nil {
+	if err := validatePerconaFlags(); err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}

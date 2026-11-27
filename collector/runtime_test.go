@@ -29,7 +29,7 @@ func TestNewRuntimeValidatesConfig(t *testing.T) {
 		t.Fatalf("expected valid config to succeed: %v", err)
 	}
 
-	cfg.DataSourceName = ""
+	cfg.ExporterQueryTimeout = -time.Second
 	if _, err := NewRuntime(cfg, promslog.NewNopLogger()); err == nil {
 		t.Fatal("expected runtime construction to revalidate config")
 	}
