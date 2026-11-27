@@ -1,0 +1,9 @@
+[client]
+user = root
+password = abc
+[client.bad_port]
+user = test
+port = notanumber
+[client.bad_aws_iam_auth]
+user = test
+aws-iam-auth = notabool
