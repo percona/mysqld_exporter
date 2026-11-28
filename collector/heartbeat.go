@@ -130,7 +130,7 @@ func (s ScrapeHeartbeat) Scrape(ctx context.Context, instance *instance, ch chan
 		)
 	}
 
-	return nil
+	return heartbeatRows.Err()
 }
 
 // check interface

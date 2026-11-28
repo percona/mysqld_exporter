@@ -25,8 +25,9 @@ GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'127.0.0.1';
 ```
 
 Run the exporter with `--mysqld.address=127.0.0.1:3306`. For remote or
-containerized deployments, replace `127.0.0.1` with the client host or address
-that the MySQL server observes.
+containerized deployments, point `--mysqld.address` at the MySQL server, and in
+the statements above replace `127.0.0.1` with the client host or address that
+the MySQL server observes.
 
 For a Unix socket connection, such as
 `--mysqld.address=unix:///run/mysqld/mysqld.sock` or a `socket=` entry in the
@@ -38,7 +39,7 @@ GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
 ```
 
 For MariaDB 10.5.9 and later, also grant `SLAVE MONITOR` (an alias for
-`REPLICA MONITOR`) when using the enabled-by-default `slave_status` collector.
+`REPLICA MONITOR`) when the `slave_status` collector is enabled with `--collect.slave_status`.
 `REPLICATION CLIENT` alone does not permit
 [`SHOW REPLICA STATUS`](https://mariadb.com/docs/server/reference/sql-statements/administrative-sql-statements/show/show-replica-status)
 on these versions:
@@ -122,14 +123,16 @@ Example format for flags for version <= 0.10.0:
 
 ### Collector Flags
 
+Every collector is disabled unless its flag is passed.
+
 Name                                                         | MySQL Version | Description
 -------------------------------------------------------------|---------------|------------------------------------------------------------------------------------
 collect.auto_increment.columns                               | 5.1           | Collect auto_increment columns and max values from information_schema.
 collect.binlog_size                                          | 5.1           | Collect the current size of all registered binlog files
 collect.engine_innodb_status                                 | 5.1           | Collect from SHOW ENGINE INNODB STATUS.
 collect.engine_tokudb_status                                 | 5.6           | Collect from SHOW ENGINE TOKUDB STATUS.
-collect.global_status                                        | 5.1           | Collect from SHOW GLOBAL STATUS (Enabled by default)
-collect.global_variables                                     | 5.1           | Collect from SHOW GLOBAL VARIABLES (Enabled by default)
+collect.global_status                                        | 5.1           | Collect from SHOW GLOBAL STATUS.
+collect.global_variables                                     | 5.1           | Collect from SHOW GLOBAL VARIABLES.
 collect.plugins                                              | 5.1           | Collect from SHOW PLUGINS
 collect.heartbeat                                            | 5.1           | Collect from [heartbeat](#heartbeat).
 collect.heartbeat.database                                   | 5.1           | Database from where to collect heartbeat data. (default: heartbeat)
@@ -170,7 +173,7 @@ collect.perf_schema.tablelocks                               | 5.6           | C
 collect.perf_schema.replication_group_members                | 5.7           | Collect metrics from performance_schema.replication_group_members.
 collect.perf_schema.replication_group_member_stats           | 5.7           | Collect metrics from performance_schema.replication_group_member_stats.
 collect.perf_schema.replication_applier_status_by_worker     | 5.7           | Collect metrics from performance_schema.replication_applier_status_by_worker.
-collect.slave_status                                         | 5.1           | Collect from SHOW SLAVE STATUS (Enabled by default)
+collect.slave_status                                         | 5.1           | Collect from SHOW SLAVE STATUS.
 collect.slave_hosts                                          | 5.1           | Collect from SHOW SLAVE HOSTS
 collect.sys.user_summary                                     | 5.7           | Collect metrics from sys.x$user_summary (disabled by default).
 

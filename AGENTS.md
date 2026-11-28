@@ -46,8 +46,9 @@ setup; do not duplicate those documents here.
   scrape succeeds.
 - Use `go test ./collector` for a focused collector check and `make test` for
   the broader Go test suite.
-- Run the repository's default `make` checks before considering substantive Go
-  changes complete.
+- Run `make all` (format, build, short tests) and `make style vet` before
+  considering substantive Go changes complete; CI also runs `golangci-lint`
+  with `.golangci-required.yml` and `.golangci.yml` (`make init` installs it).
 - Use `TEST_MYSQL_DSN='root@tcp(127.0.0.1:3306)/' make test` when behavior
   depends on a real database. Test relevant MySQL and MariaDB versions when
   semantics differ; `sqlmock` alone is insufficient for those cases.

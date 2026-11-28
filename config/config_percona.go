@@ -16,6 +16,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // perconaCollectorConfig adapts the upstream collector set for PMM: every collector is
@@ -74,4 +75,15 @@ func (m *MySqlConfig) keepPerconaTLSRules() {
 	if m.SslCert == "" || m.SslKey == "" {
 		m.SslCert, m.SslKey = "", ""
 	}
+}
+
+// perconaTLSConfigName returns the name a section's TLS settings are registered under. The
+// driver reserves true, false, 1, 0, skip-verify and preferred as values of its tls option,
+// so a section with one of those names gets brackets around it.
+func perconaTLSConfigName(section string) string {
+	switch strings.ToLower(section) {
+	case "0", "1", "false", "true", "preferred", "skip-verify":
+		return "[" + section + "]"
+	}
+	return section
 }

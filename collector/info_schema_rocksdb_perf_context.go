@@ -267,7 +267,7 @@ func (ScrapeRocksDBPerfContext) Scrape(ctx context.Context, instance *instance, 
 			ch <- prometheus.MustNewConstMetric(v.desc, v.vtype, value, schema, table, part)
 		}
 	}
-	return nil
+	return informationSchemaInnodbCmpMemRows.Err()
 }
 
 // check interface

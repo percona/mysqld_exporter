@@ -361,3 +361,45 @@ func TestScrapeTableSchemaStatsExpiryError(t *testing.T) {
 	require.ErrorIs(t, err, failure)
 	assert.Empty(t, metrics)
 }
+
+func TestScrapersReturnRowIterationErrors(t *testing.T) {
+	failure := errors.New("connection lost")
+
+	for _, tt := range []struct {
+		name    string
+		scraper Scraper
+		query   string
+		rows    *sqlmock.Rows
+	}{
+		{
+			name:    "heartbeat",
+			scraper: ScrapeHeartbeat{Database: "heartbeat", Table: "heartbeat"},
+			query:   "SELECT UNIX_TIMESTAMP(ts), UNIX_TIMESTAMP(NOW(6)), server_id from `heartbeat`.`heartbeat`",
+			rows: sqlmock.NewRows([]string{"UNIX_TIMESTAMP(ts)", "UNIX_TIMESTAMP(NOW(6))", "server_id"}).
+				AddRow("1487597613.001320", "1487598113.448042", 1).
+				AddRow("1487597614.001320", "1487598114.448042", 2).
+				RowError(1, failure),
+		},
+		{
+			name:    "info_schema.rocksdb_perf_context",
+			scraper: ScrapeRocksDBPerfContext{},
+			query:   rocksdbPerfContextQuery,
+			rows: sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "PARTITION_NAME", "STAT_TYPE", "VALUE"}).
+				AddRow("db", "t1", "", "USER_KEY_COMPARISON_COUNT", 1).
+				AddRow("db", "t2", "", "USER_KEY_COMPARISON_COUNT", 2).
+				RowError(1, failure),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			mock.ExpectQuery(sanitizeQuery(tt.query)).WillReturnRows(tt.rows)
+
+			metrics, err := scrapeMetrics(t, tt.scraper, &instance{db: db})
+			require.ErrorIs(t, err, failure)
+			assert.NotEmpty(t, metrics, "the rows before the failure are still exported")
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

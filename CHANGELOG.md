@@ -16,12 +16,13 @@ BREAKING CHANGES:
 * Selected `mysql_global_status_*` and `mysql_slave_status_*` metrics now expose Counter or Gauge types instead of Untyped.
 This includes query and table-cache totals, thread and uptime values, and replica running and lag values.
 Consumers that inspect metric family types should review these series. #1099
+This fork keeps these metrics untyped.
 
 Changes:
 
 * [FEATURE] Add the optional `info_schema.innodb_trx` collector for active transaction counts and oldest transaction age by state. #1087
 * [FEATURE] Add the optional `info_schema.schema_size` collector, exporting data and index size per schema. #1091
-* [ENHANCEMENT] Type selected global and replica status metrics as counters or gauges. #1099
+* [ENHANCEMENT] Type selected global and replica status metrics as counters or gauges. #1099 (not in this fork)
 * [BUGFIX] Allow literal dollar signs in configuration-file passwords by escaping them as `$$`. #1005
 * [BUGFIX] Preserve HTTP/2 negotiation across web TLS configuration reloads through the exporter-toolkit update. #1089
 * [BUGFIX] Parse the binary log file number after the final dot when the basename contains dots. #1095
@@ -35,7 +36,7 @@ Changes:
 * [FEATURE] Add `--exporter.query_timeout` to apply a per-scraper timeout so a single slow scraper cannot cancel the others sharing the request context #1025
 * [ENHANCEMENT] Add distroless Docker image variant #1030
 * [ENHANCEMENT] Publish images to GHCR #1031
-* [ENHANCEMENT] Raise the default per-scrape connection limit from 1 to 2 and add `--exporter.max_open_connections` to configure it, preventing scrapers from cascade-failing behind a slow query #1025
+* [ENHANCEMENT] Raise the default per-scrape connection limit from 1 to 2 and add `--exporter.max_open_connections` to configure it, preventing scrapers from cascade-failing behind a slow query #1025 (this fork keeps its default of 3, see CHANGES.md)
 * [BUGFIX] Fix a race condition due to which targets could use custom CA from different config sections #1044
 
 ## 0.19.0 / 2026-03-18

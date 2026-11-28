@@ -213,3 +213,25 @@ func TestValidatePercona(t *testing.T) {
 		})
 	}
 }
+
+func TestPerconaTLSConfigNameForReservedSections(t *testing.T) {
+	certFile, _ := writeTestCertificate(t)
+
+	for _, section := range []string{"true", "TRUE", "false", "1", "0", "skip-verify", "preferred", "client"} {
+		t.Run(section, func(t *testing.T) {
+			cfg := MySqlConfig{User: "root", SslCa: certFile}
+			dsn, err := cfg.FormDSN("mysql.example:3306", section)
+			require.NoError(t, err)
+			t.Cleanup(func() { mysql.DeregisterTLSConfig(perconaTLSConfigName(section)) })
+
+			parsed, err := mysql.ParseDSN(dsn)
+			require.NoError(t, err)
+			require.NotNil(t, parsed.TLS)
+			assert.NotNil(t, parsed.TLS.RootCAs)
+			assert.False(t, parsed.TLS.InsecureSkipVerify)
+		})
+	}
+
+	// Other section names stay the registration name, as upstream has it.
+	assert.Equal(t, "client.server1", perconaTLSConfigName("client.server1"))
+}

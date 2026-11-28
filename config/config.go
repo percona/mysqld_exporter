@@ -561,10 +561,11 @@ func (m MySqlConfig) FormDSN(target string, configSectionName string) (string, e
 		m.TlsServerName != ""
 
 	if hasCustomTLS {
-		if err := m.CustomizeTLS(configSectionName); err != nil {
+		tlsConfigName := perconaTLSConfigName(configSectionName)
+		if err := m.CustomizeTLS(tlsConfigName); err != nil {
 			return "", fmt.Errorf("failed to register a custom TLS configuration for mysql dsn: %w", err)
 		}
-		config.TLSConfig = configSectionName
+		config.TLSConfig = tlsConfigName
 	} else if m.TlsInsecureSkipVerify {
 		config.TLSConfig = "skip-verify"
 	}

@@ -602,7 +602,7 @@ func TestFormDSNWithInvalidClientCertificate(t *testing.T) {
 
 func TestFormDSNWithReservedTLSConfigName(t *testing.T) {
 	cfg := MySqlConfig{TlsServerName: "mysql.example"}
-	if _, err := cfg.FormDSN("mysql.example:3306", "true"); err == nil {
+	if err := cfg.CustomizeTLS("true"); err == nil {
 		t.Fatal("reserved TLS configuration name must return its registration error")
 	}
 }
