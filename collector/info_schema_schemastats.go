@@ -19,6 +19,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -52,7 +53,7 @@ var (
 )
 
 // ScrapeSchemaStat collects from `information_schema.table_statistics` grouped by schema.
-type ScrapeSchemaStat struct{}
+type ScrapeSchemaStat config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeSchemaStat) Name() string {

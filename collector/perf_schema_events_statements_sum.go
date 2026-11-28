@@ -19,32 +19,33 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 const perfEventsStatementsSumQuery = `
 	SELECT
-		SUM(COUNT_STAR) AS SUM_COUNT_STAR,
-		SUM(SUM_CREATED_TMP_DISK_TABLES) AS SUM_SUM_CREATED_TMP_DISK_TABLES,
-		SUM(SUM_CREATED_TMP_TABLES) AS SUM_SUM_CREATED_TMP_TABLES,
-		SUM(SUM_ERRORS) AS SUM_SUM_ERRORS,
-		SUM(SUM_LOCK_TIME) AS SUM_SUM_LOCK_TIME,
-		SUM(SUM_NO_GOOD_INDEX_USED) AS SUM_SUM_NO_GOOD_INDEX_USED,
-		SUM(SUM_NO_INDEX_USED) AS SUM_SUM_NO_INDEX_USED,
-		SUM(SUM_ROWS_AFFECTED) AS SUM_SUM_ROWS_AFFECTED,
-		SUM(SUM_ROWS_EXAMINED) AS SUM_SUM_ROWS_EXAMINED,
-		SUM(SUM_ROWS_SENT) AS SUM_SUM_ROWS_SENT,
-		SUM(SUM_SELECT_FULL_JOIN) AS SUM_SUM_SELECT_FULL_JOIN,
-		SUM(SUM_SELECT_FULL_RANGE_JOIN) AS SUM_SUM_SELECT_FULL_RANGE_JOIN,
-		SUM(SUM_SELECT_RANGE) AS SUM_SUM_SELECT_RANGE,
-		SUM(SUM_SELECT_RANGE_CHECK) AS SUM_SUM_SELECT_RANGE_CHECK,
-		SUM(SUM_SELECT_SCAN) AS SUM_SUM_SELECT_SCAN,
-		SUM(SUM_SORT_MERGE_PASSES) AS SUM_SUM_SORT_MERGE_PASSES,
-		SUM(SUM_SORT_RANGE) AS SUM_SUM_SORT_RANGE,
-		SUM(SUM_SORT_ROWS) AS SUM_SUM_SORT_ROWS,
-		SUM(SUM_SORT_SCAN) AS SUM_SUM_SORT_SCAN,
-		SUM(SUM_TIMER_WAIT) AS SUM_SUM_TIMER_WAIT,
-		SUM(SUM_WARNINGS) AS SUM_SUM_WARNINGS
+		COALESCE(SUM(COUNT_STAR), 0) AS SUM_COUNT_STAR,
+		COALESCE(SUM(SUM_CREATED_TMP_DISK_TABLES), 0) AS SUM_SUM_CREATED_TMP_DISK_TABLES,
+		COALESCE(SUM(SUM_CREATED_TMP_TABLES), 0) AS SUM_SUM_CREATED_TMP_TABLES,
+		COALESCE(SUM(SUM_ERRORS), 0) AS SUM_SUM_ERRORS,
+		COALESCE(SUM(SUM_LOCK_TIME), 0) AS SUM_SUM_LOCK_TIME,
+		COALESCE(SUM(SUM_NO_GOOD_INDEX_USED), 0) AS SUM_SUM_NO_GOOD_INDEX_USED,
+		COALESCE(SUM(SUM_NO_INDEX_USED), 0) AS SUM_SUM_NO_INDEX_USED,
+		COALESCE(SUM(SUM_ROWS_AFFECTED), 0) AS SUM_SUM_ROWS_AFFECTED,
+		COALESCE(SUM(SUM_ROWS_EXAMINED), 0) AS SUM_SUM_ROWS_EXAMINED,
+		COALESCE(SUM(SUM_ROWS_SENT), 0) AS SUM_SUM_ROWS_SENT,
+		COALESCE(SUM(SUM_SELECT_FULL_JOIN), 0) AS SUM_SUM_SELECT_FULL_JOIN,
+		COALESCE(SUM(SUM_SELECT_FULL_RANGE_JOIN), 0) AS SUM_SUM_SELECT_FULL_RANGE_JOIN,
+		COALESCE(SUM(SUM_SELECT_RANGE), 0) AS SUM_SUM_SELECT_RANGE,
+		COALESCE(SUM(SUM_SELECT_RANGE_CHECK), 0) AS SUM_SUM_SELECT_RANGE_CHECK,
+		COALESCE(SUM(SUM_SELECT_SCAN), 0) AS SUM_SUM_SELECT_SCAN,
+		COALESCE(SUM(SUM_SORT_MERGE_PASSES), 0) AS SUM_SUM_SORT_MERGE_PASSES,
+		COALESCE(SUM(SUM_SORT_RANGE), 0) AS SUM_SUM_SORT_RANGE,
+		COALESCE(SUM(SUM_SORT_ROWS), 0) AS SUM_SUM_SORT_ROWS,
+		COALESCE(SUM(SUM_SORT_SCAN), 0) AS SUM_SUM_SORT_SCAN,
+		COALESCE(SUM(SUM_TIMER_WAIT), 0) AS SUM_SUM_TIMER_WAIT,
+		COALESCE(SUM(SUM_WARNINGS), 0) AS SUM_SUM_WARNINGS
 	FROM performance_schema.events_statements_summary_by_digest;
 	`
 
@@ -158,7 +159,7 @@ var (
 )
 
 // ScrapePerfEventsStatementsSum collects from `performance_schema.events_statements_summary_by_digest`.
-type ScrapePerfEventsStatementsSum struct{}
+type ScrapePerfEventsStatementsSum config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapePerfEventsStatementsSum) Name() string {
@@ -186,12 +187,12 @@ func (ScrapePerfEventsStatementsSum) Scrape(ctx context.Context, instance *insta
 	defer perfEventsStatementsSumRows.Close()
 
 	var (
-		total, createdTmpDiskTables, createdTmpTables, errors uint64
-		lockTime, noGoodIndexUsed, noIndexUsed, rowsAffected  uint64
-		rowsExamined, rowsSent, selectFullJoin                uint64
-		selectFullRangeJoin, selectRange, selectRangeCheck    uint64
-		selectScan, sortMergePasses, sortRange, sortRows      uint64
-		sortScan, timerWait, warnings                         uint64
+		total, createdTmpDiskTables, createdTmpTables, errors float64
+		lockTime, noGoodIndexUsed, noIndexUsed, rowsAffected  float64
+		rowsExamined, rowsSent, selectFullJoin                float64
+		selectFullRangeJoin, selectRange, selectRangeCheck    float64
+		selectScan, sortMergePasses, sortRange, sortRows      float64
+		sortScan, timerWait, warnings                         float64
 	)
 
 	for perfEventsStatementsSumRows.Next() {
@@ -206,67 +207,67 @@ func (ScrapePerfEventsStatementsSum) Scrape(ctx context.Context, instance *insta
 			return err
 		}
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumTotalDesc, prometheus.CounterValue, float64(total),
+			performanceSchemaEventsStatementsSumTotalDesc, prometheus.CounterValue, total,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumCreatedTmpDiskTablesDesc, prometheus.CounterValue, float64(createdTmpDiskTables),
+			performanceSchemaEventsStatementsSumCreatedTmpDiskTablesDesc, prometheus.CounterValue, createdTmpDiskTables,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumCreatedTmpTablesDesc, prometheus.CounterValue, float64(createdTmpTables),
+			performanceSchemaEventsStatementsSumCreatedTmpTablesDesc, prometheus.CounterValue, createdTmpTables,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumErrorsDesc, prometheus.CounterValue, float64(errors),
+			performanceSchemaEventsStatementsSumErrorsDesc, prometheus.CounterValue, errors,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumLockTimeDesc, prometheus.CounterValue, float64(lockTime),
+			performanceSchemaEventsStatementsSumLockTimeDesc, prometheus.CounterValue, lockTime,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumNoGoodIndexUsedDesc, prometheus.CounterValue, float64(noGoodIndexUsed),
+			performanceSchemaEventsStatementsSumNoGoodIndexUsedDesc, prometheus.CounterValue, noGoodIndexUsed,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumNoIndexUsedDesc, prometheus.CounterValue, float64(noIndexUsed),
+			performanceSchemaEventsStatementsSumNoIndexUsedDesc, prometheus.CounterValue, noIndexUsed,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumRowsAffectedDesc, prometheus.CounterValue, float64(rowsAffected),
+			performanceSchemaEventsStatementsSumRowsAffectedDesc, prometheus.CounterValue, rowsAffected,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumRowsExaminedDesc, prometheus.CounterValue, float64(rowsExamined),
+			performanceSchemaEventsStatementsSumRowsExaminedDesc, prometheus.CounterValue, rowsExamined,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumRowsSentDesc, prometheus.CounterValue, float64(rowsSent),
+			performanceSchemaEventsStatementsSumRowsSentDesc, prometheus.CounterValue, rowsSent,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSelectFullJoinDesc, prometheus.CounterValue, float64(selectFullJoin),
+			performanceSchemaEventsStatementsSumSelectFullJoinDesc, prometheus.CounterValue, selectFullJoin,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSelectFullRangeJoinDesc, prometheus.CounterValue, float64(selectFullRangeJoin),
+			performanceSchemaEventsStatementsSumSelectFullRangeJoinDesc, prometheus.CounterValue, selectFullRangeJoin,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSelectRangeDesc, prometheus.CounterValue, float64(selectRange),
+			performanceSchemaEventsStatementsSumSelectRangeDesc, prometheus.CounterValue, selectRange,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSelectRangeCheckDesc, prometheus.CounterValue, float64(selectRangeCheck),
+			performanceSchemaEventsStatementsSumSelectRangeCheckDesc, prometheus.CounterValue, selectRangeCheck,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSelectScanDesc, prometheus.CounterValue, float64(selectScan),
+			performanceSchemaEventsStatementsSumSelectScanDesc, prometheus.CounterValue, selectScan,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSortMergePassesDesc, prometheus.CounterValue, float64(sortMergePasses),
+			performanceSchemaEventsStatementsSumSortMergePassesDesc, prometheus.CounterValue, sortMergePasses,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSortRangeDesc, prometheus.CounterValue, float64(sortRange),
+			performanceSchemaEventsStatementsSumSortRangeDesc, prometheus.CounterValue, sortRange,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSortRowsDesc, prometheus.CounterValue, float64(sortRows),
+			performanceSchemaEventsStatementsSumSortRowsDesc, prometheus.CounterValue, sortRows,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumSortScanDesc, prometheus.CounterValue, float64(sortScan),
+			performanceSchemaEventsStatementsSumSortScanDesc, prometheus.CounterValue, sortScan,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumTimerWaitDesc, prometheus.CounterValue, float64(timerWait)/picoSeconds,
+			performanceSchemaEventsStatementsSumTimerWaitDesc, prometheus.CounterValue, timerWait/picoSeconds,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			performanceSchemaEventsStatementsSumWarningsDesc, prometheus.CounterValue, float64(warnings),
+			performanceSchemaEventsStatementsSumWarningsDesc, prometheus.CounterValue, warnings,
 		)
 	}
 	return nil

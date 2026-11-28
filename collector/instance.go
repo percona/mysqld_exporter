@@ -20,9 +20,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/alecthomas/kingpin/v2"
 	"github.com/blang/semver/v4"
+
+	"github.com/percona/mysqld_exporter/auth"
 )
 
 const (
@@ -30,21 +32,6 @@ const (
 	FlavorMariaDB          = "mariadb"
 	versionQuery           = "SELECT @@version;"
 	performanceSchemaQuery = "SELECT @@performance_schema;"
-)
-
-var (
-	exporterMaxOpenConns = kingpin.Flag(
-		"exporter.max-open-conns",
-		"Maximum number of open connections to the database. https://golang.org/pkg/database/sql/#DB.SetMaxOpenConns",
-	).Default("3").Int()
-	exporterMaxIdleConns = kingpin.Flag(
-		"exporter.max-idle-conns",
-		"Maximum number of connections in the idle connection pool. https://golang.org/pkg/database/sql/#DB.SetMaxIdleConns",
-	).Default("3").Int()
-	exporterConnMaxLifetime = kingpin.Flag(
-		"exporter.conn-max-lifetime",
-		"Maximum amount of time a connection may be reused. https://golang.org/pkg/database/sql/#DB.SetConnMaxLifetime",
-	).Default("1m").Duration()
 )
 
 type instance struct {
@@ -83,20 +70,21 @@ func (i *instance) loadMetadata(ctx context.Context) error {
 	return nil
 }
 
-func newInstance(ctx context.Context, dsn string) (*instance, error) {
-	db, err := sql.Open("mysql", dsn)
+func newInstance(ctx context.Context, dsn string, maxOpenConns, maxIdleConns int, connMaxLifetime time.Duration, provider auth.Provider) (*instance, error) {
+	connector, err := auth.OpenConnector(dsn, provider)
 	if err != nil {
 		return nil, err
 	}
+	db := sql.OpenDB(connector)
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(connMaxLifetime)
 
 	return newInstanceFromDB(ctx, db)
 }
 
 func newInstanceFromDB(ctx context.Context, db *sql.DB) (*instance, error) {
 	i := &instance{db: db}
-	i.db.SetMaxOpenConns(*exporterMaxOpenConns)
-	i.db.SetMaxIdleConns(*exporterMaxIdleConns)
-	i.db.SetConnMaxLifetime(*exporterConnMaxLifetime)
 
 	if err := i.loadMetadata(ctx); err != nil {
 		i.db.Close()
@@ -127,8 +115,8 @@ func (i *instance) Close() error {
 }
 
 // Ping checks connection availability and possibly invalidates the connection if it fails.
-func (i *instance) Ping() error {
-	if err := i.db.Ping(); err != nil {
+func (i *instance) Ping(ctx context.Context) error {
+	if err := i.db.PingContext(ctx); err != nil {
 		if cerr := i.Close(); cerr != nil {
 			return err
 		}

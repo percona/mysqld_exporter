@@ -29,8 +29,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/percona/mysqld_exporter/collector"
+	"github.com/percona/mysqld_exporter/config"
 )
 
 // bin stores information about path of executable and attached port
@@ -84,12 +87,12 @@ func TestBin(t *testing.T) {
 	tests := []func(*testing.T, bin){
 		testLanding,
 		testProbe,
+		testPprof,
 	}
 
 	portStart := 56000
 	t.Run(binName, func(t *testing.T) {
 		for _, f := range tests {
-			f := f // capture range variable
 			fName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
 			portStart++
 			data := bin{
@@ -102,6 +105,69 @@ func TestBin(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestValidateExporterFlags(t *testing.T) {
+	tests := []struct {
+		name                 string
+		maxOpenConns         int
+		maxIdleConns         int
+		connMaxLifetime      time.Duration
+		queryTimeout         int
+		timeoutOffsetSeconds float64
+		wantErr              bool
+	}{
+		{name: "defaults", maxOpenConns: 2, timeoutOffsetSeconds: defaultTimeoutOffsetSeconds},
+		{name: "disabled query timeout", maxOpenConns: 2, queryTimeout: 0},
+		{name: "positive query timeout", maxOpenConns: 2, queryTimeout: 1},
+		{name: "zero max open connections", maxOpenConns: 0, wantErr: true},
+		{name: "negative max open connections", maxOpenConns: -1, wantErr: true},
+		{name: "positive idle limit", maxOpenConns: 2, maxIdleConns: 1},
+		{name: "negative idle limit", maxOpenConns: 2, maxIdleConns: -1, wantErr: true},
+		{name: "positive connection lifetime", maxOpenConns: 2, connMaxLifetime: time.Minute},
+		{name: "negative connection lifetime", maxOpenConns: 2, connMaxLifetime: -time.Second, wantErr: true},
+		{name: "negative query timeout", maxOpenConns: 2, queryTimeout: -1, wantErr: true},
+		{name: "negative timeout offset", maxOpenConns: 2, timeoutOffsetSeconds: -1, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateExporterFlags(tt.maxOpenConns, tt.maxIdleConns, tt.queryTimeout, tt.connMaxLifetime, tt.timeoutOffsetSeconds)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateExporterFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestConnectionPoolFlags(t *testing.T) {
+	// Parsing again restores all flag defaults for other tests.
+	t.Cleanup(func() {
+		if _, err := kingpin.CommandLine.Parse(nil); err != nil {
+			t.Error(err)
+		}
+	})
+	for _, tt := range []struct {
+		name        string
+		args        []string
+		wantMaxOpen int
+		wantMaxIdle int
+		wantLife    time.Duration
+	}{
+		{name: "defaults", wantMaxOpen: 3, wantMaxIdle: 3, wantLife: time.Minute},
+		{name: "overrides", args: []string{"--exporter.max_open_connections=4", "--exporter.max_idle_connections=3", "--exporter.conn_max_lifetime=1m30s"}, wantMaxOpen: 4, wantMaxIdle: 3, wantLife: 90 * time.Second},
+		{name: "disabled", args: []string{"--exporter.max_idle_connections=0", "--exporter.conn_max_lifetime=0s"}, wantMaxOpen: 3},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := kingpin.CommandLine.Parse(tt.args); err != nil {
+				t.Fatal(err)
+			}
+			cfg := configFromFlags(nil)
+			if cfg.ExporterMaxOpenConns != tt.wantMaxOpen || cfg.ExporterMaxIdleConns != tt.wantMaxIdle || cfg.ExporterConnMaxLifetime != tt.wantLife {
+				t.Errorf("pool config: max open=%d, max idle=%d, lifetime=%v; want %d, %d, %v", cfg.ExporterMaxOpenConns, cfg.ExporterMaxIdleConns, cfg.ExporterConnMaxLifetime, tt.wantMaxOpen, tt.wantMaxIdle, tt.wantLife)
+			}
+		})
+	}
 }
 
 func testLanding(t *testing.T, data bin) {
@@ -274,6 +340,28 @@ func getBody(urlToGet string) ([]byte, error) {
 	return body, nil
 }
 
+func TestInnodbTrxCollectorRegistration(t *testing.T) {
+	scraper := collector.ScrapeInnodbTrx{}
+	if got := scraper.Name(); got != "info_schema.innodb_trx" {
+		t.Fatalf("collector name = %q", got)
+	}
+	cfg := config.NewConfigWithDefaults()
+	if enabled, exists := cfg.Collectors[scraper.Name()]; !exists || enabled {
+		t.Fatal("InnoDB transaction collector must be registered and disabled by default")
+	}
+}
+
+func TestSchemaSizeCollectorRegistration(t *testing.T) {
+	scraper := collector.ScrapeSchemaSize{}
+	if got := scraper.Name(); got != "info_schema.schema_size" {
+		t.Fatalf("collector name = %q", got)
+	}
+	cfg := config.NewConfigWithDefaults()
+	if enabled, exists := cfg.Collectors[scraper.Name()]; !exists || enabled {
+		t.Fatal("schema size collector must be registered and disabled by default")
+	}
+}
+
 func Test_filterScrapers(t *testing.T) {
 	type args struct {
 		scrapers      []collector.Scraper
@@ -284,21 +372,26 @@ func Test_filterScrapers(t *testing.T) {
 		args args
 		want []collector.Scraper
 	}{
-		{"args_appears_in_collector",
+		{
+			"args_appears_in_collector",
 			args{
 				[]collector.Scraper{collector.ScrapeGlobalStatus{}},
 				[]string{collector.ScrapeGlobalStatus{}.Name()},
 			},
 			[]collector.Scraper{
 				collector.ScrapeGlobalStatus{},
-			}},
-		{"args_absent_in_collector",
+			},
+		},
+		{
+			"args_absent_in_collector",
 			args{
 				[]collector.Scraper{collector.ScrapeGlobalStatus{}},
 				[]string{collector.ScrapeGlobalVariables{}.Name()},
 			},
-			[]collector.Scraper{collector.ScrapeGlobalStatus{}}},
-		{"respect_params",
+			[]collector.Scraper{collector.ScrapeGlobalStatus{}},
+		},
+		{
+			"respect_params",
 			args{
 				[]collector.Scraper{
 					collector.ScrapeGlobalStatus{},
@@ -322,8 +415,8 @@ func Test_filterScrapers(t *testing.T) {
 
 func Test_getScrapeTimeoutSeconds(t *testing.T) {
 	type args struct {
-		timeoutHeader string
-		offset        float64
+		timeoutHeader        string
+		timeoutOffsetSeconds float64
 	}
 	tests := []struct {
 		name        string
@@ -331,44 +424,51 @@ func Test_getScrapeTimeoutSeconds(t *testing.T) {
 		wantTimeout float64
 		wantErr     bool
 	}{
-		{"no_timeout_header",
+		{
+			"no_timeout_header",
 			args{},
 			0, false,
 		},
-		{"zero_timeout_header",
+		{
+			"zero_timeout_header",
 			args{
 				timeoutHeader: "0",
 			},
 			0, false,
 		},
-		{"negative_timeout_header",
+		{
+			"negative_timeout_header",
 			args{
 				timeoutHeader: "-5",
 			},
 			0, true,
 		},
-		{"offset_greater_than_timeout",
+		{
+			"offset_greater_than_timeout",
 			args{
-				timeoutHeader: "5",
-				offset:        6,
+				timeoutHeader:        "5",
+				timeoutOffsetSeconds: 6,
 			},
 			0, true,
 		},
-		{"offset_equal_timeout",
+		{
+			"offset_equal_timeout",
 			args{
-				timeoutHeader: "5",
-				offset:        5,
+				timeoutHeader:        "5",
+				timeoutOffsetSeconds: 5,
 			},
 			0, true,
 		},
-		{"offset_less_than_timeout",
+		{
+			"offset_less_than_timeout",
 			args{
-				timeoutHeader: "5",
-				offset:        1,
+				timeoutHeader:        "5",
+				timeoutOffsetSeconds: 1,
 			},
 			4, false,
 		},
-		{"no_offset",
+		{
+			"no_offset",
 			args{
 				timeoutHeader: "5",
 			},
@@ -383,7 +483,7 @@ func Test_getScrapeTimeoutSeconds(t *testing.T) {
 			}
 			request.Header.Set("X-Prometheus-Scrape-Timeout-Seconds", tt.args.timeoutHeader)
 
-			timeout, err := getScrapeTimeoutSeconds(request, tt.args.offset)
+			timeout, err := getScrapeTimeoutSeconds(request, tt.args.timeoutOffsetSeconds)
 			if err != nil && !tt.wantErr {
 				t.Fatalf("unexpected error: %v", err)
 			}

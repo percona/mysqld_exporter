@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	MySQL "github.com/go-sql-driver/mysql"
+	"github.com/percona/mysqld_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -64,7 +65,7 @@ var (
 )
 
 // ScrapeReplicaHost collects from `information_schema.replica_host_status`.
-type ScrapeReplicaHost struct{}
+type ScrapeReplicaHost config.EmptyConfig
 
 // Name of the Scraper. Should be unique.
 func (ScrapeReplicaHost) Name() string {

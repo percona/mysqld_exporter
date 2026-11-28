@@ -41,7 +41,7 @@ func TestScrapePerfTableIOWaitsMySQLCompatibility(t *testing.T) {
 			ctx := t.Context()
 			dsn := startPerfTableIOContainer(t, ctx, tc.image)
 
-			instance, err := newInstance(ctx, dsn)
+			instance, err := newInstance(ctx, dsn, 1, 1, 0, nil)
 			if err != nil {
 				t.Fatalf("creating instance: %v", err)
 			}
